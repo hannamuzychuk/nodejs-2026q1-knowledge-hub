@@ -28,16 +28,14 @@ export class UserService {
   }
 
   findOne(id: string) {
-    const index = this.db.users.findIndex((u) => u.id === id);
-    if (index === -1) throw new NotFoundException('User not found');
-    this.db.users.splice(index, 1);
+    const user = this.db.users.find((u) => u.id === id);
 
-    this.db.articles.forEach((art) => {
-      if (art.authorId === id) art.authorId = null;
-    });
+   if (!user) {
+    throw new NotFoundException(`User with ID ${id} not found`);
+  }
 
-    this.db.comments = this.db.comments.filter((c) => c.authorId !== id);
-    return;
+    const { password, ...result } = user;
+    return result;
   }
 
   update(id: string, dto: UpdateUserDto) {
