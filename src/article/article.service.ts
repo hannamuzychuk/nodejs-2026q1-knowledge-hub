@@ -26,9 +26,21 @@ export class ArticleService {
     return newArticle;
   }
 
-  findAll(query: any) {
+  findAll(query: { status?: string; categoryId?: string; tag?: string}) {
     let articles = [...this.db.articles];
-    return articles;
+
+  if (query.status) {
+    articles = articles.filter(a => a.status === query.status);
+  }
+  if (query.categoryId) {
+    articles = articles.filter(a => a.categoryId === query.categoryId);
+  }
+  if (query.tag) {
+    // Poprawione: includes oraz tag zamiast categoryId
+    articles = articles.filter(a => a.tags.includes(query.tag));
+  }
+
+  return articles;
   }
 
   findOne(id: string) {
@@ -37,9 +49,14 @@ export class ArticleService {
     return article;
   }
 
-  // update(id: number, updateArticleDto: UpdateArticleDto) {
-  //   return `This action updates a #${id} article`;
-  // }
+  update(id: string, dto: UpdateArticleDto) {
+    const article = this.findOne(id);
+
+    Object.assign(article, dto);
+    article.updatedAt = Date.now();
+
+    return article;
+  }
 
   remove(id: string) {
     const index = this.db.articles.findIndex(a => a.id === id);
