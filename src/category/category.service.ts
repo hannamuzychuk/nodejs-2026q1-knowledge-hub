@@ -1,26 +1,48 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { DbService } from 'src/db/db.service';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class CategoryService {
-  create(createCategoryDto: CreateCategoryDto) {
-    return 'This action adds a new category';
+constructor(private readonly db: DbService) {}
+
+  create(dto: CreateCategoryDto) {
+    const newCategory = {
+      id: randomUUID(),
+      ...dto,
+    };
+    this.db.categories.push(newCategory);
+    return newCategory;
   }
 
   findAll() {
-    return `This action returns all category`;
+    return this.db.categories;
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} category`;
+  findOne(id: string) {
+    const category = this.db.categories.find((c) => c.id === id);
+    if (!category) throw new NotFoundException('Category not found');
+    return category;
   }
 
-  update(id: number, updateCategoryDto: UpdateCategoryDto) {
-    return `This action updates a #${id} category`;
+  update(id: string, dto: UpdateCategoryDto) {
+    const category = this.findOne(id);
+    Object.assign(category, dto);
+    return category;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} category`;
+  remove(id: string) {
+    const index = this.db.categories.findIndex((c) => c.id === id);
+    if (index === -1) throw new NotFoundException('Category not found');
+
+    this.db.articles.forEach((article) => {
+      if (article.categoryId === id) {
+        article.categoryId = null;
+      }
+    });
+
+    this.db.categories.splice(index, 1);
   }
 }

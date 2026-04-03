@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, ParseUUIDPipe } from '@nestjs/common';
 import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
@@ -19,16 +19,17 @@ export class CategoryController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.categoryService.findOne(+id);
+    return this.categoryService.findOne(id);
   }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateCategoryDto: UpdateCategoryDto) {
-    return this.categoryService.update(+id, updateCategoryDto);
+    return this.categoryService.update(id, updateCategoryDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.categoryService.remove(+id);
+  @HttpCode(204)
+  remove(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.categoryService.remove(id);
   }
 }
