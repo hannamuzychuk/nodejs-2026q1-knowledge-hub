@@ -1,0 +1,754 @@
+openapi: 3.0.0
+info:
+  title: Knowledge Hub
+  description: Knowledge hub service for managing articles, categories, and comments
+  version: 1.0.0
+
+servers:
+  - url: /api
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        login:
+          type: string
+          example: 'TestUser'
+        role:
+          type: string
+          enum: [admin, editor, viewer]
+          example: 'viewer'
+        createdAt:
+          type: number
+          example: 1655000000
+        updatedAt:
+          type: number
+          example: 1655000000
+      required:
+        - id
+        - login
+        - role
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: 'Technology'
+        description:
+          type: string
+          example: 'Articles about technology'
+      required:
+        - id
+        - name
+        - description
+    Article:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: 'Introduction to NestJS'
+        content:
+          type: string
+          example: 'NestJS is a framework for building efficient server-side applications.'
+        status:
+          type: string
+          enum: [draft, published, archived]
+          example: 'draft'
+        authorId:
+          type: string
+          format: uuid
+          nullable: true
+        categoryId:
+          type: string
+          format: uuid
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+          example: ['nodejs', 'typescript']
+        createdAt:
+          type: number
+          example: 1655000000
+        updatedAt:
+          type: number
+          example: 1655000000
+      required:
+        - id
+        - title
+        - content
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        content:
+          type: string
+          example: 'Great article!'
+        articleId:
+          type: string
+          format: uuid
+        authorId:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: number
+          example: 1655000000
+      required:
+        - id
+        - content
+        - articleId
+  responses:
+    UnauthorizedError:
+      description: Access token is missing or invalid
+    ForbiddenError:
+      description: Insufficient permissions for this operation
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/signup:
+    post:
+      tags:
+        - Auth
+      security: []
+      summary: Signup
+      description: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                login:
+                  type: string
+                  description: Username
+                password:
+                  type: string
+                  description: Password
+              required:
+                - login
+                - password
+      responses:
+        201:
+          description: Successful signup
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        400:
+          description: Bad request
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      security: []
+      summary: Login
+      description: Login and receive JWT tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                login:
+                  type: string
+                  description: Username
+                password:
+                  type: string
+                  description: Password
+              required:
+                - login
+                - password
+      responses:
+        200:
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+        403:
+          description: Incorrect login or password
+  /auth/refresh:
+    post:
+      tags:
+        - Auth
+      security: []
+      summary: Refresh tokens
+      description: Get new access and refresh tokens using a valid refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+              required:
+                - refreshToken
+      responses:
+        200:
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+        401:
+          description: No refresh token provided
+        403:
+          description: Invalid or expired refresh token
+  /user:
+    get:
+      tags:
+        - Users
+      summary: Get all users
+      description: Gets all users
+      responses:
+        200:
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+    post:
+      tags:
+        - Users
+      summary: Create user
+      description: Creates a new user (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                login:
+                  type: string
+                password:
+                  type: string
+                role:
+                  type: string
+                  enum: [admin, editor, viewer]
+              required:
+                - login
+                - password
+      responses:
+        201:
+          description: The user has been created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        400:
+          description: Bad request. body does not contain required fields
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+        403:
+          $ref: '#/components/responses/ForbiddenError'
+  /user/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+        - Users
+      summary: Get single user by id
+      description: Get single user by id
+      responses:
+        200:
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        400:
+          description: Bad request. userId is invalid (not uuid)
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+        404:
+          description: User not found
+    put:
+      tags:
+        - Users
+      summary: Update a user's password
+      description: Updates a user's password by ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                oldPassword:
+                  type: string
+                newPassword:
+                  type: string
+              required:
+                - oldPassword
+                - newPassword
+      responses:
+        200:
+          description: The user has been updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        400:
+          description: Bad request. userId is invalid (not uuid)
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+        403:
+          description: oldPassword is wrong or insufficient permissions
+        404:
+          description: User not found
+    delete:
+      tags:
+        - Users
+      summary: Delete user
+      description: Deletes user by ID. Sets authorId to null on articles, deletes user's comments.
+      responses:
+        204:
+          description: The user has been deleted
+        400:
+          description: Bad request. userId is invalid (not uuid)
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+        403:
+          $ref: '#/components/responses/ForbiddenError'
+        404:
+          description: User not found
+  /category:
+    get:
+      tags:
+        - Category
+      summary: Get all categories
+      description: Gets all categories
+      responses:
+        200:
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+    post:
+      tags:
+        - Category
+      summary: Add new category
+      description: Add new category (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+              required:
+                - name
+                - description
+      responses:
+        201:
+          description: Category is created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        400:
+          description: Bad request. body does not contain required fields
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+        403:
+          $ref: '#/components/responses/ForbiddenError'
+  /category/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - Category
+      summary: Get single category by id
+      description: Gets single category by id
+      responses:
+        200:
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        400:
+          description: Bad request. categoryId is invalid (not uuid)
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+        404:
+          description: Category was not found
+    put:
+      tags:
+        - Category
+      summary: Update category information
+      description: Update category information by UUID (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+              required:
+                - name
+                - description
+      responses:
+        200:
+          description: The category has been updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        400:
+          description: Bad request. categoryId is invalid (not uuid)
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+        403:
+          $ref: '#/components/responses/ForbiddenError'
+        404:
+          description: Category was not found
+    delete:
+      tags:
+        - Category
+      summary: Delete category
+      description: Delete category. Sets categoryId to null on associated articles.
+      responses:
+        204:
+          description: Deleted successfully
+        400:
+          description: Bad request. categoryId is invalid (not uuid)
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+        403:
+          $ref: '#/components/responses/ForbiddenError'
+        404:
+          description: Category was not found
+  /article:
+    get:
+      tags:
+        - Article
+      summary: Get articles list
+      description: Gets all articles. Supports filtering by status, categoryId, and tag.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, published, archived]
+          description: Filter by article status
+        - name: categoryId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by category ID
+        - name: tag
+          in: query
+          schema:
+            type: string
+          description: Filter by tag name (can be repeated for multiple tags)
+      responses:
+        200:
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Article'
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+    post:
+      tags:
+        - Article
+      summary: Add new article
+      description: Add new article (editor can create own, admin can create any)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                status:
+                  type: string
+                  enum: [draft, published, archived]
+                authorId:
+                  type: string
+                  format: uuid
+                  nullable: true
+                categoryId:
+                  type: string
+                  format: uuid
+                  nullable: true
+                tags:
+                  type: array
+                  items:
+                    type: string
+              required:
+                - title
+                - content
+      responses:
+        201:
+          description: Article is created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Article'
+        400:
+          description: Bad request. body does not contain required fields
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+        403:
+          $ref: '#/components/responses/ForbiddenError'
+  /article/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - Article
+      summary: Get single article by id
+      description: Gets single article by id
+      responses:
+        200:
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Article'
+        400:
+          description: Bad request. articleId is invalid (not uuid)
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+        404:
+          description: Article was not found
+    put:
+      tags:
+        - Article
+      summary: Update article information
+      description: Update article by UUID (editor can update own, admin can update any)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                status:
+                  type: string
+                  enum: [draft, published, archived]
+                categoryId:
+                  type: string
+                  format: uuid
+                  nullable: true
+                tags:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        200:
+          description: The article has been updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Article'
+        400:
+          description: Bad request. articleId is invalid (not uuid)
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+        403:
+          $ref: '#/components/responses/ForbiddenError'
+        404:
+          description: Article was not found
+    delete:
+      tags:
+        - Article
+      summary: Delete article
+      description: Delete article. Deletes all associated comments. (admin only)
+      responses:
+        204:
+          description: Deleted successfully
+        400:
+          description: Bad request. articleId is invalid (not uuid)
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+        403:
+          $ref: '#/components/responses/ForbiddenError'
+        404:
+          description: Article was not found
+  /comment:
+    get:
+      tags:
+        - Comment
+      summary: Get comments for an article
+      description: Gets all comments for a specific article. Requires articleId query parameter.
+      parameters:
+        - name: articleId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Article ID to get comments for
+      responses:
+        200:
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Comment'
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+    post:
+      tags:
+        - Comment
+      summary: Add new comment
+      description: Add a comment to an article (editor can create own, admin can create any)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                articleId:
+                  type: string
+                  format: uuid
+                authorId:
+                  type: string
+                  format: uuid
+                  nullable: true
+              required:
+                - content
+                - articleId
+      responses:
+        201:
+          description: Comment is created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        400:
+          description: Bad request. body does not contain required fields
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+        403:
+          $ref: '#/components/responses/ForbiddenError'
+        422:
+          description: Article with given articleId doesn't exist
+  /comment/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - Comment
+      summary: Get single comment by id
+      description: Gets single comment by id
+      responses:
+        200:
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        400:
+          description: Bad request. commentId is invalid (not uuid)
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+        404:
+          description: Comment was not found
+    delete:
+      tags:
+        - Comment
+      summary: Delete comment
+      description: Delete comment (admin can delete any, editor can delete own)
+      responses:
+        204:
+          description: Deleted successfully
+        400:
+          description: Bad request. commentId is invalid (not uuid)
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+        403:
+          $ref: '#/components/responses/ForbiddenError'
+        404:
+          description: Comment was not found
