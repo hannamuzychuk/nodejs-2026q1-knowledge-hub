@@ -1,10 +1,10 @@
 export class User {
-    id: string; // uuid v4
+  id: string; // uuid v4
   login: string;
   password: string;
   role: UserRole;
   createdAt: number;
-  updatedAt: number; 
+  updatedAt: number;
 }
 
 export enum UserRole {
@@ -12,4 +12,3 @@ export enum UserRole {
   EDITOR = 'editor',
   VIEWER = 'viewer',
 }
-
