@@ -23,12 +23,17 @@ export class UserService {
     };
 
     this.db.users.push(newUser);
-    const { password, ...result } = newUser;
+    const result = { ...newUser };
+    delete (result as any).password;
     return result;
   }
 
   findAll() {
-    return this.db.users.map(({ password, ...user }) => user);
+    return this.db.users.map((u) => {
+      const user = { ...u };
+      delete (user as any).password;
+      return user;
+    });
   }
 
   findOne(id: string) {
@@ -38,7 +43,8 @@ export class UserService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    const { password, ...result } = user;
+    const result = { ...user };
+    delete (result as any).password;
     return result;
   }
 
@@ -56,14 +62,16 @@ export class UserService {
       }
       user.password = dto.newPassword;
       user.updatedAt = Date.now();
-      const { password, ...result } = user;
+      const result = { ...user };
+      delete (result as any).password;
       return result;
     }
 
     Object.assign(user, dto);
     user.updatedAt = Date.now();
 
-    const { password, ...result } = user;
+    const result = { ...user };
+    delete (result as any).password;
     return result;
   }
 
