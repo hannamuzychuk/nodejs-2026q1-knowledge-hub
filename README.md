@@ -1,84 +1,143 @@
-# Knowledge Hub
+## 🚀 Key Features
 
-## Prerequisites
+*   **👤 User Management**: CRUD operations with role-based attributes (`admin`, `editor`, `viewer`).
 
-- Git - [Download & Install Git](https://git-scm.com/downloads).
-- Node.js - [Download & Install Node.js](https://nodejs.org/en/download/) and the npm package manager.
+*   **📝 Article System**: Full lifecycle management with status tracking (`draft`, `published`, `archived`) and tag support.
 
-## Downloading
+*   **📂 Category Organization**: Logical grouping of articles.
 
-```
-git clone {repository URL}
-```
+*   **💬 Comment Engine**: Interaction layer for every article.
 
-## Installing NPM modules
+*   **🔍 Advanced Filtering**: Filter articles by `status`, `categoryId`, or specific `tags`.
 
-```
-npm install
-```
+*   **🛡 Data Integrity**: Automated cascading logic on deletions (In-memory implementation).
 
-## Running application
+*   **✅ Validation**: Strict DTO validation using `class-validator` and global `ValidationPipe`.
 
-```
-npm start
-```
+*   **📖 Documentation**: Auto-generated interactive OpenAPI (Swagger) documentation.
 
-After starting the app on port (4000 as default) you can open
-in your browser OpenAPI documentation by typing http://localhost:4000/doc/.
-For more information about OpenAPI/Swagger please visit https://swagger.io/.
 
-## Testing
+---
 
-After application running open new terminal and enter:
+## 🛠 Tech Stack
 
-To run all tests without authorization
+| Component | Technology |
+| :--- | :--- |
+| **Framework** | [Nest.js](https://nestjs.com/) (Modular Architecture) |
+| **Language** | TypeScript |
+| **Documentation** | Swagger / OpenAPI 3.0 |
+| **Validation** | class-validator & class-transformer |
+| **Database** | In-memory Custom DB Service |
 
-```
-npm run test
-```
+---
+## ⚙️ Installation & Setup
 
-To run only one of all test suites
+1. **Clone the repository:**
+   ```bash
+   git clone [https://github.com/YOUR_GITHUB_ID/nodejs-2026q1-knowledge-hub.git](https://github.com/YOUR_GITHUB_ID/nodejs-2026q1-knowledge-hub.git)
+   cd nodejs-2026q1-knowledge-hub
 
-```
-npm run test -- <path to suite>
-```
+2. **Install dependencies:**
+    ```bash 
+    npm install
 
-To run all test with authorization
+3. **Configure environment:**
 
-```
-npm run test:auth
-```
+    Create a .env file in the root directory:
 
-To run only specific test suite with authorization
+    PORT=4000
 
-```
-npm run test:auth -- <path to suite>
-```
+--- 
 
-To run refresh token tests
+## 🏃 Running the Application
 
-```
-npm run test:refresh
-```
+| Mode | Command | URL |
+| :--- | :--- | :--- |
+| **Development** | `npm run start` | [http://localhost:4000](http://localhost:4000) |
+| **Watch Mode** | `npm run start:dev` | [http://localhost:4000](http://localhost:4000) |
+| **Swagger UI** | — | [http://localhost:4000/doc](http://localhost:4000/doc) |
 
-To run RBAC (role-based access control) tests
+---
+## 🛣️ API Endpoints Summary
 
-```
-npm run test:rbac
-```
+### 👤 Users (`/user`)
+*   **GET** `/user` – List all users (passwords excluded).
+*   **GET** `/user/:id` – Get user details by UUID.
+*   **POST** `/user` – Create a new user.
+*   **PUT** `/user/:id` – Update user password (requires `oldPassword`).
+*   **DELETE** `/user/:id` – Delete user.
+    > **Cascade:** Nullifies author in articles and removes related comments.
 
-### Auto-fix and format
+### 📝 Articles (`/article`)
+*   **GET** `/article` – List articles (Query params: `status`, `categoryId`, `tag`).
+*   **POST** `/article` – Create a new article.
+*   **DELETE** `/article/:id` – Delete article.
+    > **Cascade:** Removes all related comments.
 
-```
+### 📂 Categories (`/category`)
+*   **GET** `/category` – List all categories.
+*   **POST** `/category` – Create a category.
+*   **DELETE** `/category/:id` – Delete category.
+    > **Cascade:** Nullifies category reference in related articles.
+
+### 💬 Comments (`/comment`)
+*   **GET** `/comment?articleId={id}` – Get comments for a specific article.
+*   **POST** `/comment` – Add a new comment (validates `articleId` existence).
+---
+
+## 🧹 Quality & Testing
+To maintain high code standards and verify requirements:
+
+Bash
+# Run Linter (ESLint)
 npm run lint
-```
 
-```
-npm run format
-```
+Bash
+# Run Automated Test Suite
 
-### Debugging in VSCode
+npm run test
 
-Press <kbd>F5</kbd> to debug.
+---
+## 📜 Assignment Details
+This project was developed as part of the Node.js 2026 Q1 course. It adheres to the requirements of modular architecture, dependency injection, and strict input validation.
 
-For more information, visit: https://code.visualstudio.com/docs/editor/debugging
+Requirements met:
+ - Modular separation of concerns (Users, Articles, Categories, Comments).
+
+ - In-memory data management with UUID v4.
+
+- DTO-based validation and auto-generated Swagger docs.
+
+- Correct cascading behavior for entity deletion.
+---
+
+## 📂 Project Structure
+
+```text
+
+NODEJS-2026Q1-KNOWLEDGE-HUB
+├── doc/                 # API Documentation (api.yaml)
+├── src/                 # Application source code
+│   ├── article/         # Article module, controller, and service
+│   ├── category/        # Category module, controller, and service
+│   ├── comment/         # Comment module, controller, and service
+│   ├── db/              # In-memory database logic
+│   ├── user/            # User module, controller, and service
+│   ├── app.controller.ts
+│   ├── app.module.ts
+│   ├── app.service.ts
+│   └── main.ts          # Application entry point
+├── test/                # E2E and Unit tests           
+├── .env.example         # Template for environment variables
+├── .eslintrc.js         # Linter configuration
+├── .gitignore
+├── .prettierrc          # Formatter configuration
+├── jest.config.json     # Test runner configuration
+├── nest-cli.json        # Nest CLI configuration
+├── package.json         # Dependencies and scripts
+├── README.md            # Project documentation
+├── tsconfig.build.json
+└── tsconfig.json        # TypeScript configuration
+
+
+
