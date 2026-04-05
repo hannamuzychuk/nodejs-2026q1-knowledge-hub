@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, HttpCode, ParseUUIDPipe, Put } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Delete,
+  Query,
+  HttpCode,
+  ParseUUIDPipe,
+  Put,
+} from '@nestjs/common';
 import { ArticleService } from './article.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
@@ -18,16 +29,35 @@ export class ArticleController {
 
   @Get()
   @ApiOperation({ summary: 'Get all articles with optional filtering' })
-  @ApiQuery({ name: 'status', required: false, type: String, description: 'Filter by status (e.g., draft, published)' })
-  @ApiQuery({ name: 'categoryId', required: false, type: String, description: 'Filter by category ID' })
-  @ApiQuery({ name: 'tag', required: false, type: String, description: 'Filter by a specific tag' })
-  findAll(@Query() query: { status?: string; categoryId?: string; tag?: string}) {
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    type: String,
+    description: 'Filter by status (e.g., draft, published)',
+  })
+  @ApiQuery({
+    name: 'categoryId',
+    required: false,
+    type: String,
+    description: 'Filter by category ID',
+  })
+  @ApiQuery({
+    name: 'tag',
+    required: false,
+    type: String,
+    description: 'Filter by a specific tag',
+  })
+  findAll(
+    @Query() query: { status?: string; categoryId?: string; tag?: string },
+  ) {
     return this.articleService.findAll(query);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a specific article by ID' })
-  findOne(@Param('id', new ParseUUIDPipe({ errorHttpStatusCode: 400 })) id: string) {
+  findOne(
+    @Param('id', new ParseUUIDPipe({ errorHttpStatusCode: 400 })) id: string,
+  ) {
     return this.articleService.findOne(id);
   }
 
@@ -35,7 +65,8 @@ export class ArticleController {
   @ApiOperation({ summary: 'Update an article' })
   update(
     @Param('id', new ParseUUIDPipe({ errorHttpStatusCode: 400 })) id: string,
-    @Body() updateArticleDto: UpdateArticleDto) {
+    @Body() updateArticleDto: UpdateArticleDto,
+  ) {
     return this.articleService.update(id, updateArticleDto);
   }
 
@@ -43,7 +74,9 @@ export class ArticleController {
   @HttpCode(204)
   @ApiOperation({ summary: 'Delete an article' })
   @ApiResponse({ status: 204, description: 'Article successfully deleted' })
-  remove(@Param('id', new ParseUUIDPipe({ errorHttpStatusCode: 400 })) id: string) {
+  remove(
+    @Param('id', new ParseUUIDPipe({ errorHttpStatusCode: 400 })) id: string,
+  ) {
     return this.articleService.remove(id);
   }
 }

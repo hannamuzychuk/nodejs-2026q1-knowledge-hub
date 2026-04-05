@@ -3,7 +3,7 @@ import { CreateUserDto } from './create-user.dto';
 import { IsOptional, IsString } from 'class-validator';
 
 export class UpdateUserDto extends PartialType(CreateUserDto) {
-    @ApiPropertyOptional({ example: 'oldSecret123' })
+  @ApiPropertyOptional({ example: 'oldSecret123' })
   @IsString()
   @IsOptional()
   oldPassword?: string;
@@ -12,9 +12,4 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   @IsString()
   @IsOptional()
   newPassword?: string;
-
-  // @ApiPropertyOptional({ example: 'new_login' })
-  // @IsString()
-  // @IsOptional()
-  // login?: string;
 }

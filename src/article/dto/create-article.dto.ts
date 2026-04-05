@@ -1,9 +1,16 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsArray, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from "class-validator";
+import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsArray,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 import { ArticleStatus } from '../entities/article.entity';
 
 export class CreateArticleDto {
-    @ApiProperty({ example: 'How to start with Nest.js' })
+  @ApiProperty({ example: 'How to start with Nest.js' })
   @IsString()
   @IsNotEmpty()
   title: string;
@@ -13,7 +20,11 @@ export class CreateArticleDto {
   @IsNotEmpty()
   content: string;
 
-  @ApiProperty({ enum: ArticleStatus, default: ArticleStatus.DRAFT, required: false })
+  @ApiProperty({
+    enum: ArticleStatus,
+    default: ArticleStatus.DRAFT,
+    required: false,
+  })
   @IsEnum(ArticleStatus)
   @IsOptional()
   status?: ArticleStatus = ArticleStatus.DRAFT;

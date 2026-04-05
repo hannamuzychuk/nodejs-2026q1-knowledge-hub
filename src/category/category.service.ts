@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 
 @Injectable()
 export class CategoryService {
-constructor(private readonly db: DbService) {}
+  constructor(private readonly db: DbService) {}
 
   create(dto: CreateCategoryDto) {
     const newCategory = {
