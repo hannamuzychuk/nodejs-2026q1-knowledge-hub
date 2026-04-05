@@ -11,8 +11,10 @@ constructor(private readonly db: DbService) {}
   create(dto: CreateCategoryDto) {
     const newCategory = {
       id: randomUUID(),
-      ...dto,
+      name: dto.name,
+      description: dto.description || '',
     };
+
     this.db.categories.push(newCategory);
     return newCategory;
   }
@@ -44,5 +46,6 @@ constructor(private readonly db: DbService) {}
     });
 
     this.db.categories.splice(index, 1);
+    return;
   }
 }

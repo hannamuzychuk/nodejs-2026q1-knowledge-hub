@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { DbService } from 'src/db/db.service';
@@ -38,17 +38,39 @@ export class UserService {
     return result;
   }
 
-  update(id: string, dto: UpdateUserDto) {
-    const user = this.db.users.find((u) => u.id === id);
-    if (!user) throw new NotFoundException('User not found');
+  update(id: string, dto: UpdateUserDto) {  
+  // const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  // if (!uuidRegex.test(id)) {
+  //   throw new BadRequestException('Invalid UUID format');
+  // }
 
-    Object.assign(user, dto);
+  // if (!dto || Object.keys(dto).length === 0) {
+  //   throw new BadRequestException('Empty DTO');
+  // }
+
+  const user = this.db.users.find((u) => u.id === id);
+  if (!user) throw new NotFoundException('User not found');
+
+  // if(!dto.newPassword || dto.oldPassword) {
+  //   throw new BadRequestException('Invalid DTO');
+  // }
+
+  if (dto.oldPassword && dto.newPassword) {
+    if (user.password !== dto.oldPassword) {
+      throw new ForbiddenException('Old password is wrong');
+    }
+    user.password = dto.newPassword;
     user.updatedAt = Date.now();
-
     const { password, ...result } = user;
-
     return result;
   }
+
+  Object.assign(user, dto);
+  user.updatedAt = Date.now();
+
+  const { password, ...result } = user;
+  return result;
+}
 
   remove(id: string) {
     const index = this.db.users.findIndex(u => u.id === id);
