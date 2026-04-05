@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, ParseUUIDPipe, Put, ValidationPipe } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -24,22 +24,25 @@ export class UserController {
   @Get(':id')
   @ApiOperation({ summary: 'Get user by ID' })
   @ApiResponse({ status: 200, description: 'User found' })
+  @ApiResponse({ status: 400, description: 'Invalid UUID' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', new ParseUUIDPipe({ errorHttpStatusCode: 400 })) id: string) {
     return this.userService.findOne(id);
   }
 
-  @Patch(':id')
+  @Put(':id')
+  @HttpCode(200)
   @ApiOperation({ summary: 'Update user data' })
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+  update(
+    @Param('id', new ParseUUIDPipe({ errorHttpStatusCode: 400 })) id: string, 
+    @Body(new ValidationPipe({ forbidUnknownValues: true })) updateUserDto: UpdateUserDto) {
     return this.userService.update(id, updateUserDto);
   }
 
   @Delete(':id')
   @HttpCode(204)
   @ApiOperation({ summary: 'Delete user' })
-  @ApiResponse({ status: 204, description: 'User successfully deleted' })
-  remove(@Param('id') id: string) {
+  remove(@Param('id', new ParseUUIDPipe({ errorHttpStatusCode: 400 })) id: string) {
     return this.userService.remove(id);
   }
 }

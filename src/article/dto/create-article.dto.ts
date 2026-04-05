@@ -3,12 +3,12 @@ import { IsArray, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from "class
 import { ArticleStatus } from '../entities/article.entity';
 
 export class CreateArticleDto {
-    @ApiProperty({ example: 'Jak zacząć z Nest.js' })
+    @ApiProperty({ example: 'How to start with Nest.js' })
   @IsString()
   @IsNotEmpty()
   title: string;
 
-  @ApiProperty({ example: 'Treść bardzo ciekawego artykułu...' })
+  @ApiProperty({ example: 'Content of a very interesting article...' })
   @IsString()
   @IsNotEmpty()
   content: string;
@@ -18,7 +18,7 @@ export class CreateArticleDto {
   @IsOptional()
   status?: ArticleStatus = ArticleStatus.DRAFT;
 
-  @ApiProperty({ example: 'uuid-kategorii', required: false })
+  @ApiProperty({ example: 'category-uuid-here', required: false })
   @IsUUID()
   @IsOptional()
   categoryId?: string | null;
@@ -29,8 +29,7 @@ export class CreateArticleDto {
   @IsOptional()
   tags?: string[] = [];
 
-  // authorId zazwyczaj bierzemy z tokena, ale jeśli zadanie wymaga go w body:
-  @ApiProperty({ example: 'uuid-uzytkownika', required: false })
+  @ApiProperty({ example: 'user-uuid-here', required: false })
   @IsUUID()
   @IsOptional()
   authorId?: string | null;

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, Query, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, Query, ParseUUIDPipe, Put } from '@nestjs/common';
 import { CommentService } from './comment.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
@@ -26,13 +26,15 @@ export class CommentController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a specific comment by ID' })
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', new ParseUUIDPipe({ errorHttpStatusCode: 400 })) id: string) {
     return this.commentService.findOne(id);
   }
 
-  @Patch(':id')
-  @ApiOperation({ summary: 'Update a comment' })
-  update(@Param('id') id: string, @Body() updateCommentDto: UpdateCommentDto) {
+  @Put(':id')
+  @ApiOperation({ summary: 'Get a specific comment by ID' })
+  update(
+    @Param('id', new ParseUUIDPipe({ errorHttpStatusCode: 400 })) id: string, 
+    @Body() updateCommentDto: UpdateCommentDto) {
     return this.commentService.update(id, updateCommentDto);
   }
 
@@ -40,7 +42,7 @@ export class CommentController {
   @HttpCode(204)
   @ApiOperation({ summary: 'Delete a comment' })
   @ApiResponse({ status: 204, description: 'Comment deleted successfully' })
-  remove(@Param('id', new ParseUUIDPipe()) id: string) {
+  remove(@Param('id', new ParseUUIDPipe({ errorHttpStatusCode: 400 })) id: string) {
     return this.commentService.remove(id);
   }
 }

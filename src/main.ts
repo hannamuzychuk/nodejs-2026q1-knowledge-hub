@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import * as dotenv from 'dotenv';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { ValidationPipe } from '@nestjs/common';
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
 
 dotenv.config();
 
@@ -12,7 +12,15 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
     transform: true,
-    forbidNonWhitelisted: true,
+    errorHttpStatusCode: 400,
+    exceptionFactory: (errors) => {
+    const messages = errors.flatMap((err) => {
+    const constraints = err.constraints ? Object.values(err.constraints) : [];
+    const childErrors = err.children ? err.children.flatMap(c => Object.values(c.constraints || {})) : [];
+    return [...constraints, ...childErrors];
+    });
+    return new BadRequestException(messages);
+  },
   }));
 
   const config = new DocumentBuilder()
