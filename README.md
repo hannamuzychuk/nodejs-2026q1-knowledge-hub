@@ -27,14 +27,53 @@
 | **Language** | TypeScript |
 | **Documentation** | Swagger / OpenAPI 3.0 |
 | **Validation** | class-validator & class-transformer |
-| **Database** | In-memory Custom DB Service |
+| **Database** | PostgreSQL 16 (Dockerized) |
+| **Containerization** | Docker & Docker Compose |
+
+
+---
+
+## 🐳 Docker Quick Start (Recommended)
+
+The easiest way to run the application is using Docker.
+
+**Docker Hub Image:** [https://hub.docker.com/r/hannamuzychuk/knowledge-hub-api](https://hub.docker.com/r/hannamuzychuk/knowledge-hub-api)
+
+1. **Configure environment:**
+   Create a `.env` file based on `.env.example`.
+
+2. **Run the entire stack:**
+   ```bash
+   docker compose up --build
+
+---
+## Access the app:
+
+API: http://localhost:4000
+
+Swagger UI: http://localhost:4000/doc
+
+Adminer (Database UI): 
+
+Run with 
+
+```
+docker compose --profile debug up 
+```
+
+
+
+and access 
+
+http://localhost:8080
+
 
 ---
 ## ⚙️ Installation & Setup
 
 1. **Clone the repository:**
    ```bash
-   git clone [https://github.com/YOUR_GITHUB_ID/nodejs-2026q1-knowledge-hub.git](https://github.com/YOUR_GITHUB_ID/nodejs-2026q1-knowledge-hub.git)
+   git clone [https://github.com/hannamuzychuk/nodejs-2026q1-knowledge-hub.git](https://github.com/hannamuzychuk/nodejs-2026q1-knowledge-hub.git)
    cd nodejs-2026q1-knowledge-hub
 
 2. **Install dependencies:**
@@ -127,10 +166,13 @@ NODEJS-2026Q1-KNOWLEDGE-HUB
 │   ├── app.module.ts
 │   ├── app.service.ts
 │   └── main.ts          # Application entry point
-├── test/                # E2E and Unit tests           
+├── test/                # E2E and Unit tests   
+├── .dockerignore        
 ├── .env.example         # Template for environment variables
 ├── .eslintrc.js         # Linter configuration
 ├── .gitignore
+├── .docker-compose.yml   # Containerization configuration
+├──  Dockerfile 
 ├── .prettierrc          # Formatter configuration
 ├── jest.config.json     # Test runner configuration
 ├── nest-cli.json        # Nest CLI configuration
