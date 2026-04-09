@@ -5,14 +5,14 @@ import {
 } from '@nestjs/common';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class CommentService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateCommentDto) {
-    const article = this.prisma.article.findUnique({
+    const article = await this.prisma.article.findUnique({
       where: {
         id: dto.articleId,
       },
@@ -21,11 +21,13 @@ export class CommentService {
       throw new UnprocessableEntityException('Article does not exist');
     }
 
-    const author = await this.prisma.user.findUnique({
-      where: { id: dto.authorId },
-    });
-    if (!author) {
-      throw new UnprocessableEntityException('Author does not exist');
+    if (dto.authorId) {
+      const author = await this.prisma.user.findUnique({
+        where: { id: dto.authorId },
+      });
+      if (!author) {
+        throw new UnprocessableEntityException('Author does not exist');
+      }
     }
     return this.prisma.comment.create({
       data: {
@@ -77,6 +79,7 @@ export class CommentService {
   }
 
   async remove(id: string) {
+    await this.findOne(id);
     await this.prisma.comment.delete({
       where: { id },
     });
