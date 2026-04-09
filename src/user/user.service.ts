@@ -17,18 +17,20 @@ export class UserService {
       data: {
         login: dto.login,
         password: dto.password,
-        role: dto.role  || 'VIEWER',
+        role: dto.role || 'VIEWER',
       },
     });
 
-    const {password, ...result } = user;
-    return result;
+    delete (user as any).password;
+    return user;
   }
 
   async findAll() {
-      const users = await this.prisma.user.findMany();
-      return users.map(({ password, ...user }) => user);
-
+    const users = await this.prisma.user.findMany();
+    return users.map((user) => {
+      delete (user as any).password;
+      return user;
+    });
   }
 
   async findOne(id: string) {
@@ -36,12 +38,12 @@ export class UserService {
       where: { id },
     });
 
-    if (!user){
+    if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    const { password, ...result } = user;
-    return result;
+    delete (user as any).password;
+    return user;
   }
 
   async update(id: string, dto: UpdateUserDto) {
@@ -58,17 +60,17 @@ export class UserService {
       if (user.password !== dto.oldPassword) {
         throw new ForbiddenException('Old password is wrong');
       }
-    const updatedUser = await this.prisma.user.update({
+      const updatedUser = await this.prisma.user.update({
         where: { id },
         data: {
           password: dto.newPassword,
         },
       });
 
-      const { password, ...result } = updatedUser;
-      return result;
+      delete (updatedUser as any).password;
+      return updatedUser;
     }
-      throw new BadRequestException('Invalid DTO - password change required');
+    throw new BadRequestException('Invalid DTO - password change required');
   }
 
   async remove(id: string) {
@@ -76,5 +78,5 @@ export class UserService {
     if (!user) throw new NotFoundException('User not found');
 
     await this.prisma.user.delete({ where: { id } });
-  } 
+  }
 }

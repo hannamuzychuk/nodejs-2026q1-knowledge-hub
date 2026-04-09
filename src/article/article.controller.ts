@@ -48,7 +48,6 @@ export class ArticleController {
     type: String,
     description: 'Filter by a specific tag',
   })
-
   @Get()
   findAll(
     @Query() query: { status?: Status; categoryId?: string; tag?: string },
