@@ -29,6 +29,8 @@
 | **Validation** | class-validator & class-transformer |
 | **Database** | PostgreSQL 16 (Dockerized) |
 | **Containerization** | Docker & Docker Compose |
+| **ORM** |   Prisma    |
+| **Database**  | PostgreSQL 16 |
 
 
 ---
@@ -67,7 +69,39 @@ and access
 
 http://localhost:8080
 
+---
 
+## 📊 Database Schema (ERD)
+
+The application uses **PostgreSQL** with the following relations:
+*   **User ↔ Article**: One-to-Many (Author can have multiple articles).
+*   **Category ↔ Article**: One-to-Many (Category contains multiple articles).
+*   **Article ↔ Comment**: One-to-Many (Article has multiple comments).
+*   **User ↔ Comment**: One-to-Many (User writes multiple comments).
+*   **Article ↔ Tag**: Many-to-Many (Articles have multiple tags; tags belong to many articles).
+---
+
+## 💎 Prisma ORM Commands
+
+If you need to manage the database manually:
+
+*   **Generate Prisma Client:** `npx prisma generate`
+*   **Run Migrations:** `npx prisma migrate dev`
+*   **Open Prisma Studio (GUI):** `npx prisma studio`
+*   **Seed Database:** `npx prisma db seed`
+---
+
+## 🛡️ Data Integrity & Cascading
+- **User Deletion**: Articles are kept (`ON DELETE SET NULL`), while comments are removed (`ON DELETE CASCADE`).
+- **Article Deletion**: All related comments are automatically removed (`ON DELETE CASCADE`).
+- **Category Deletion**: Articles remain in the system but their category reference is cleared (`ON DELETE SET NULL`).
+---
+
+## 🌱 Database Seeding
+To populate the database with initial data (users, categories, articles, and tags) for testing, run:
+```
+npx prisma db seed
+```
 ---
 ## ⚙️ Installation & Setup
 
@@ -143,7 +177,7 @@ This project was developed as part of the Node.js 2026 Q1 course. It adheres to 
 Requirements met:
  - Modular separation of concerns (Users, Articles, Categories, Comments).
 
- - In-memory data management with UUID v4.
+ - Persistent data management with **PostgreSQL** and **Prisma ORM**..
 
 - DTO-based validation and auto-generated Swagger docs.
 
@@ -155,12 +189,17 @@ Requirements met:
 ```text
 
 NODEJS-2026Q1-KNOWLEDGE-HUB
-├── doc/                 # API Documentation (api.yaml)
+├── doc/                # API Documentation (api.yaml)
+├── prisma 
+|   ├──migtarions
+|   ├──schema.prisma
+|   ├──seed.ts
 ├── src/                 # Application source code
 │   ├── article/         # Article module, controller, and service
 │   ├── category/        # Category module, controller, and service
 │   ├── comment/         # Comment module, controller, and service
 │   ├── db/              # In-memory database logic
+│   ├── prisma/          # Prisma ORM logic
 │   ├── user/            # User module, controller, and service
 │   ├── app.controller.ts
 │   ├── app.module.ts
