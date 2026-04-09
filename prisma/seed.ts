@@ -24,11 +24,13 @@ async function main() {
         },
     });
 
-    const catTech = await prisma.category.create({
-        data: {
-            name: 'Technology',
-            description: 'Articles related to technology',
-        },
+    const catTech = await prisma.category.upsert({
+      where: { name: 'Technology' },
+      update: {},
+      create: {
+      name: 'Technology',
+      description: 'Articles related to technology',
+  },
     });
 
     const catScience = await prisma.category.create({

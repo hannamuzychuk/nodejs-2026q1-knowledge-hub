@@ -14,6 +14,7 @@ import { ArticleService } from './article.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Status } from '@prisma/client';
 
 @ApiTags('article')
 @Controller('article')
@@ -47,8 +48,10 @@ export class ArticleController {
     type: String,
     description: 'Filter by a specific tag',
   })
+
+  @Get()
   findAll(
-    @Query() query: { status?: string; categoryId?: string; tag?: string },
+    @Query() query: { status?: Status; categoryId?: string; tag?: string },
   ) {
     return this.articleService.findAll(query);
   }
