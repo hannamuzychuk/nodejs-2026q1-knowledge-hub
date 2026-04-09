@@ -6,7 +6,7 @@ import {
   IsString,
   MinLength,
 } from 'class-validator';
-import { UserRole } from '../entities/user.entity';
+import { Role } from '@prisma/client';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'johndoe' })
@@ -20,8 +20,8 @@ export class CreateUserDto {
   @MinLength(6)
   password: string;
 
-  @ApiProperty({ enum: UserRole, default: UserRole.VIEWER, required: false })
-  @IsEnum(UserRole)
+  @ApiProperty({ enum: Role, default: Role.VIEWER, required: false })
+  @IsEnum(Role)
   @IsOptional()
-  role?: UserRole = UserRole.VIEWER;
+  role?: Role;
 }

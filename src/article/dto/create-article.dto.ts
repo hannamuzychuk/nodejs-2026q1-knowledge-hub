@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Status } from '@prisma/client';
 import {
   IsArray,
   IsEnum,
@@ -7,7 +8,6 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { ArticleStatus } from '../entities/article.entity';
 
 export class CreateArticleDto {
   @ApiProperty({ example: 'How to start with Nest.js' })
@@ -21,13 +21,13 @@ export class CreateArticleDto {
   content: string;
 
   @ApiProperty({
-    enum: ArticleStatus,
-    default: ArticleStatus.DRAFT,
+    enum: Status,
+    default: Status.DRAFT,
     required: false,
   })
-  @IsEnum(ArticleStatus)
+  @IsEnum(Status)
   @IsOptional()
-  status?: ArticleStatus = ArticleStatus.DRAFT;
+  status?: Status = Status.DRAFT;
 
   @ApiProperty({ example: 'category-uuid-here', required: false })
   @IsUUID()
