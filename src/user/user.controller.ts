@@ -25,7 +25,7 @@ export class UserController {
   @ApiOperation({ summary: 'Create a new user' })
   async create(@Body() createUserDto: CreateUserDto) {
     const user = await this.userService.create(createUserDto);
-    // This ensures the @Transform decorators in CreateUserDto are applied
+
     return plainToInstance(CreateUserDto, user);
   }
 
