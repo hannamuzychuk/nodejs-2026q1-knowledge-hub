@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { Status } from '@prisma/client';
 
 @Injectable()
@@ -14,7 +14,7 @@ export class ArticleService {
         title: dto.title,
         content: dto.content,
         status: dto.status || Status.DRAFT,
-        author: { connect: { id: dto.authorId } },
+        author: dto.authorId ? { connect: { id: dto.authorId } } : undefined,
         category: dto.categoryId
           ? { connect: { id: dto.categoryId } }
           : undefined,
@@ -36,7 +36,9 @@ export class ArticleService {
   async findAll(query: { status?: Status; categoryId?: string; tag?: string }) {
     return this.prisma.article.findMany({
       where: {
-        status: query.status,
+        status: query.status
+          ? (String(query.status).toUpperCase() as Status)
+          : undefined,
         categoryId: query.categoryId,
         tags: query.tag ? { some: { name: query.tag } } : undefined,
       },

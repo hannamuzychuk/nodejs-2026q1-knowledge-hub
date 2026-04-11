@@ -14,6 +14,7 @@ import { CommentService } from './comment.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { plainToInstance } from 'class-transformer';
 
 @ApiTags('comment')
 @Controller('comment')
@@ -24,8 +25,9 @@ export class CommentController {
   @ApiOperation({ summary: 'Create a new comment' })
   @ApiResponse({ status: 201, description: 'Comment created successfully' })
   @ApiResponse({ status: 422, description: 'Article does not exist' })
-  create(@Body() createCommentDto: CreateCommentDto) {
-    return this.commentService.create(createCommentDto);
+  async create(@Body() createCommentDto: CreateCommentDto) {
+    const comment = await this.commentService.create(createCommentDto);
+    return plainToInstance(CreateCommentDto, comment);
   }
 
   @Get()
@@ -33,25 +35,28 @@ export class CommentController {
     summary: 'Get all comments (optionally filtered by Article ID)',
   })
   @ApiQuery({ name: 'articleId', required: false, type: String })
-  findAll(@Query('articleId') articleId?: string) {
-    return this.commentService.findAll({ articleId });
+  async findAll(@Query('articleId') articleId?: string) {
+    const comments = await this.commentService.findAll({ articleId });
+    return plainToInstance(CreateCommentDto, comments);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a specific comment by ID' })
-  findOne(
+  async findOne(
     @Param('id', new ParseUUIDPipe({ errorHttpStatusCode: 400 })) id: string,
   ) {
-    return this.commentService.findOne(id);
+    const comment = await this.commentService.findOne(id);
+    return plainToInstance(CreateCommentDto, comment);
   }
 
   @Put(':id')
   @ApiOperation({ summary: 'Get a specific comment by ID' })
-  update(
+  async update(
     @Param('id', new ParseUUIDPipe({ errorHttpStatusCode: 400 })) id: string,
     @Body() updateCommentDto: UpdateCommentDto,
   ) {
-    return this.commentService.update(id, updateCommentDto);
+    const comment = await this.commentService.update(id, updateCommentDto);
+    return plainToInstance(UpdateCommentDto, comment);
   }
 
   @Delete(':id')

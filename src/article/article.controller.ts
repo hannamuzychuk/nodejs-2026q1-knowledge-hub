@@ -15,6 +15,7 @@ import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Status } from '@prisma/client';
+import { plainToInstance } from 'class-transformer';
 
 @ApiTags('article')
 @Controller('article')
@@ -24,8 +25,9 @@ export class ArticleController {
   @Post()
   @ApiOperation({ summary: 'Create a new article' })
   @ApiResponse({ status: 201, description: 'Article created successfully' })
-  create(@Body() createArticleDto: CreateArticleDto) {
-    return this.articleService.create(createArticleDto);
+  async create(@Body() createArticleDto: CreateArticleDto) {
+    const article = await this.articleService.create(createArticleDto);
+    return plainToInstance(CreateArticleDto, article);
   }
 
   @Get()
@@ -48,28 +50,30 @@ export class ArticleController {
     type: String,
     description: 'Filter by a specific tag',
   })
-  @Get()
-  findAll(
+  async findAll(
     @Query() query: { status?: Status; categoryId?: string; tag?: string },
   ) {
-    return this.articleService.findAll(query);
+    const articles = await this.articleService.findAll(query);
+    return plainToInstance(CreateArticleDto, articles);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a specific article by ID' })
-  findOne(
+  async findOne(
     @Param('id', new ParseUUIDPipe({ errorHttpStatusCode: 400 })) id: string,
   ) {
-    return this.articleService.findOne(id);
+    const article = await this.articleService.findOne(id);
+    return plainToInstance(CreateArticleDto, article);
   }
 
   @Put(':id')
   @ApiOperation({ summary: 'Update an article' })
-  update(
+  async update(
     @Param('id', new ParseUUIDPipe({ errorHttpStatusCode: 400 })) id: string,
     @Body() updateArticleDto: UpdateArticleDto,
   ) {
-    return this.articleService.update(id, updateArticleDto);
+    const article = await this.articleService.update(id, updateArticleDto);
+    return plainToInstance(UpdateArticleDto, article);
   }
 
   @Delete(':id')

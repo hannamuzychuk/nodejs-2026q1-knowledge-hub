@@ -65,25 +65,13 @@ CREATE TABLE "_ArticleTags" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "User_login_key" ON "User"("login");
-
--- CreateIndex
 CREATE INDEX "Article_status_idx" ON "Article"("status");
 
 -- CreateIndex
 CREATE INDEX "Article_categoryId_idx" ON "Article"("categoryId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Category_name_key" ON "Category"("name");
-
--- CreateIndex
 CREATE UNIQUE INDEX "Tag_name_key" ON "Tag"("name");
-
--- CreateIndex
-CREATE UNIQUE INDEX "_ArticleTags_AB_unique" ON "_ArticleTags"("A", "B");
-
--- CreateIndex
-CREATE INDEX "_ArticleTags_B_index" ON "_ArticleTags"("B");
 
 -- AddForeignKey
 ALTER TABLE "Article" ADD CONSTRAINT "Article_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;

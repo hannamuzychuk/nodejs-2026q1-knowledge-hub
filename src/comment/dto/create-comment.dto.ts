@@ -1,4 +1,12 @@
-import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateCommentDto {
   @IsString()
@@ -12,4 +20,12 @@ export class CreateCommentDto {
   @IsUUID()
   @IsOptional()
   authorId?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Transform(({ value }) => (value instanceof Date ? value.getTime() : value), {
+    toPlainOnly: true,
+  })
+  createdAt?: number;
 }
