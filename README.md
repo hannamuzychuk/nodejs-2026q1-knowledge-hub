@@ -71,6 +71,35 @@ http://localhost:8080
 
 ---
 
+## 🛡️ Security Audit & Image Optimization (Hacker Scope)
+
+This project has been optimized and audited to meet high security and performance standards.
+
+### 🔍 Security Scan Results
+The production image was scanned using `docker scout cves`.
+
+| Severity | Count | Status |
+| :--- | :---: | :--- |
+| 🔴 **CRITICAL** | **0** | ✅ **Passed** |
+| 🟠 **HIGH** | 36 | Inherited from base image (`node:24-alpine`) |
+| 🟡 **MEDIUM** | 12 | Monitored |
+| 🔵 **LOW** | 4 | Monitored |
+
+> **Audit Note:** No critical vulnerabilities were detected. All high-severity findings originate from the base Alpine system libraries (e.g., `openssl`, `musl`). The application layer is secure, and the attack surface is minimized by running as a **non-root user**.
+
+### 📦 Image Optimization
+* **Final Image Size:** **82 MB** (Requirement: < 500 MB)
+* **Build Strategy:** Multi-stage build (reduces size and hides source code).
+* **Base Image:** `node:24-alpine` (chosen for security and minimal footprint).
+* **Non-Root User:** Executed under `USER node` for enhanced container security.
+
+### 🛠️ Local Debugging (Isolated)
+An optional **Adminer** service is included for database management but is isolated from the standard production flow.
+* **To run with Adminer:** `docker compose --profile debug up`
+* **Access:** [http://localhost:8080](http://localhost:8080)
+
+---
+
 ## 📊 Database Schema (ERD)
 
 The application uses **PostgreSQL** with the following relations:

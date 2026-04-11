@@ -25,10 +25,18 @@ export class UserService {
   }
 
   async findAll() {
-    const users = await this.prisma.user.findMany();
+    const users = await this.prisma.user.findMany({
+      include: {
+        _count: {
+          select: { articles: true, comments: true },
+        },
+      },
+    });
+
     return users.map((user) => {
-      delete (user as any).password;
-      return user;
+      const userResponse = { ...user };
+      delete (userResponse as { password?: string }).password;
+      return userResponse;
     });
   }
 
@@ -71,6 +79,12 @@ export class UserService {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
 
-    await this.prisma.user.delete({ where: { id } });
+    return await this.prisma.$transaction(async (tx) => {
+      await tx.article.updateMany({
+        where: { authorId: id },
+        data: { status: 'ARCHIVED' },
+      });
+      return await tx.user.delete({ where: { id } });
+    });
   }
 }
