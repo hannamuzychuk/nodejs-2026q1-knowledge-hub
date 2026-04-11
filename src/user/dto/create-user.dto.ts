@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
+  IsNumber,
   IsEnum,
   IsNotEmpty,
   IsOptional,
@@ -23,5 +25,27 @@ export class CreateUserDto {
   @ApiProperty({ enum: Role, default: Role.VIEWER, required: false })
   @IsEnum(Role)
   @IsOptional()
+  @Transform(
+    ({ value }) => (typeof value === 'string' ? value.toLowerCase() : value),
+    {
+      toPlainOnly: true,
+    },
+  )
   role?: Role;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  @Transform(({ value }) => (value instanceof Date ? value.getTime() : value), {
+    toPlainOnly: true,
+  })
+  createdAt?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  @Transform(({ value }) => (value instanceof Date ? value.getTime() : value), {
+    toPlainOnly: true,
+  })
+  updatedAt?: number;
 }

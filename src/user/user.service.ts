@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -47,10 +46,6 @@ export class UserService {
   }
 
   async update(id: string, dto: UpdateUserDto) {
-    if (!dto.newPassword || !dto.oldPassword) {
-      throw new BadRequestException('Invalid DTO');
-    }
-
     const user = await this.prisma.user.findUnique({
       where: { id },
     });
@@ -70,7 +65,6 @@ export class UserService {
       delete (updatedUser as any).password;
       return updatedUser;
     }
-    throw new BadRequestException('Invalid DTO - password change required');
   }
 
   async remove(id: string) {

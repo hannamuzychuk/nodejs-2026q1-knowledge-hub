@@ -4,33 +4,27 @@ const prisma = new PrismaClient();
     console.log('🌱 Start seeding...');
 
 async function main() {
-    const admin = await prisma.user.upsert({
-        where: {login: 'admin'},
-        update: {},
-        create: {
+    const admin = await prisma.user.create({
+        data: {
             login: 'admin',
             password: 'hashed_password_123',
             role: Role.ADMIN,
         },
     });
 
-    const editor = await prisma.user.upsert({
-        where: {login: 'editor'},
-        update: {},
-        create: {
+    const editor = await prisma.user.create({
+        data: {
             login: 'editor',
             password: 'hashed_password_456',
             role: Role.EDITOR,
         },
     });
 
-    const catTech = await prisma.category.upsert({
-      where: { name: 'Technology' },
-      update: {},
-      create: {
-      name: 'Technology',
-      description: 'Articles related to technology',
-  },
+    const catTech = await prisma.category.create({
+      data: {
+          name: 'Technology',
+          description: 'Articles related to technology',
+      },
     });
 
     const catScience = await prisma.category.create({

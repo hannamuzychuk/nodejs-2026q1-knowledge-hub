@@ -1,13 +1,19 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import * as dotenv from 'dotenv';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { BadRequestException, ValidationPipe } from '@nestjs/common';
+import {
+  ClassSerializerInterceptor,
+  BadRequestException,
+  ValidationPipe,
+} from '@nestjs/common';
 
 dotenv.config();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -15,7 +21,7 @@ async function bootstrap() {
       transform: true,
       forbidNonWhitelisted: false,
       transformOptions: {
-        enableImplicitConversion: true,
+        enableImplicitConversion: false,
       },
       errorHttpStatusCode: 400,
       exceptionFactory: (errors) => {
