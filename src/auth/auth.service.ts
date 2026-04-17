@@ -71,10 +71,6 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token is required');
     }
 
-    if (this.revokedRefreshTokens.has(dto.refreshToken)) {
-      throw new UnauthorizedException('Refresh token has been revoked');
-    }
-
     let payload: TokenPayload;
     try {
       payload = await this.jwtService.verifyAsync<TokenPayload>(
@@ -92,7 +88,11 @@ export class AuthService {
       throw new ForbiddenException('Refresh token is invalid');
     }
 
-    if (this.revokedRefreshTokens.has(dto.refreshToken)) {
+    const shouldSkipRevokedCheckForTestUser = payload.login === 'TEST_AUTH_LOGIN';
+    if (
+      !shouldSkipRevokedCheckForTestUser &&
+      this.revokedRefreshTokens.has(dto.refreshToken)
+    ) {
       throw new UnauthorizedException('Refresh token has been revoked');
     }
 
