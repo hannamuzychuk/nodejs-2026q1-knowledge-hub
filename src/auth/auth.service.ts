@@ -15,6 +15,8 @@ type TokenPayload = AuthUser;
 
 @Injectable()
 export class AuthService {
+  private readonly revokedRefreshTokens = new Set<string>();
+
   constructor(
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
@@ -56,6 +58,10 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token is required');
     }
 
+    if (this.revokedRefreshTokens.has(dto.refreshToken)) {
+      throw new UnauthorizedException('Refresh token has been revoked');
+    }
+
     let payload: TokenPayload;
     try {
       payload = await this.jwtService.verifyAsync<TokenPayload>(
@@ -65,12 +71,12 @@ export class AuthService {
         },
       );
     } catch {
-      throw new ForbiddenException('Invalid or expired refresh token');
+      throw new UnauthorizedException('Refresh token is invalid or expired');
     }
 
     const user = await this.userService.findById(payload.userId);
     if (!user) {
-      throw new ForbiddenException('Invalid refresh token');
+      throw new UnauthorizedException('Refresh token is invalid');
     }
 
     return this.generateTokenPair({
@@ -78,6 +84,26 @@ export class AuthService {
       login: user.login,
       role: user.role.toLowerCase() as TokenPayload['role'],
     });
+  }
+
+  async logout(dto: RefreshTokenDto) {
+    if (!dto?.refreshToken || typeof dto.refreshToken !== 'string') {
+      throw new UnauthorizedException('Refresh token is required');
+    }
+
+    try {
+      await this.jwtService.verifyAsync<TokenPayload>(dto.refreshToken, {
+        secret: this.getRefreshSecret(),
+      });
+    } catch {
+      throw new UnauthorizedException('Refresh token is invalid or expired');
+    }
+
+    this.revokedRefreshTokens.add(dto.refreshToken);
+
+    return {
+      message: 'Logged out successfully',
+    };
   }
 
   private async generateTokenPair(payload: TokenPayload) {

@@ -7,11 +7,67 @@ import {
   BadRequestException,
   ValidationPipe,
 } from '@nestjs/common';
+import { NextFunction, Request, Response } from 'express';
 
 dotenv.config();
 
+type RateLimitConfig = {
+  windowMs: number;
+  maxRequests: number;
+  message: string;
+};
+
+const buildIpRateLimiter = (config: RateLimitConfig) => {
+  const requestsByIp = new Map<string, number[]>();
+
+  return (req: Request, res: Response, next: NextFunction) => {
+    const now = Date.now();
+    const ip =
+      req.ip ||
+      String(req.headers['x-forwarded-for'] || '')
+        .split(',')[0]
+        .trim() ||
+      'unknown';
+
+    const currentRequests = requestsByIp.get(ip) || [];
+    const recentRequests = currentRequests.filter(
+      (timestamp) => now - timestamp < config.windowMs,
+    );
+
+    if (recentRequests.length >= config.maxRequests) {
+      return res.status(429).json({
+        statusCode: 429,
+        message: config.message,
+        error: 'Too Many Requests',
+      });
+    }
+
+    recentRequests.push(now);
+    requestsByIp.set(ip, recentRequests);
+    next();
+  };
+};
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  app.use(
+    '/auth/signup',
+    buildIpRateLimiter({
+      windowMs: 60_000,
+      maxRequests: 3,
+      message: 'Too many signup attempts. Try again in a minute.',
+    }),
+  );
+
+  app.use(
+    '/auth/login',
+    buildIpRateLimiter({
+      windowMs: 60_000,
+      maxRequests: 5,
+      message: 'Too many login attempts. Try again in a minute.',
+    }),
+  );
 
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
