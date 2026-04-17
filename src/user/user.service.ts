@@ -1,8 +1,10 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -12,16 +14,21 @@ export class UserService {
   constructor(private prisma: PrismaService) {}
 
   async create(dto: CreateUserDto) {
+    const existingUser = await this.findByLogin(dto.login);
+    if (existingUser) {
+      throw new BadRequestException('Login is already taken');
+    }
+
+    const hashedPassword = await this.hashPassword(dto.password);
     const user = await this.prisma.user.create({
       data: {
         login: dto.login,
-        password: dto.password,
+        password: hashedPassword,
         role: dto.role || 'VIEWER',
       },
     });
 
-    delete (user as any).password;
-    return user;
+    return this.removePassword(user);
   }
 
   async findAll() {
@@ -33,58 +40,92 @@ export class UserService {
       },
     });
 
-    return users.map((user) => {
-      const userResponse = { ...user };
-      delete (userResponse as { password?: string }).password;
-      return userResponse;
-    });
+    return users.map((user) => this.removePassword(user));
   }
 
   async findOne(id: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
-    });
+    const user = await this.findById(id);
 
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    delete (user as any).password;
-    return user;
+    return this.removePassword(user);
   }
 
   async update(id: string, dto: UpdateUserDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
-    });
+    const user = await this.findById(id);
     if (!user) throw new NotFoundException('User not found');
 
-    if (dto.oldPassword && dto.newPassword) {
-      if (user.password !== dto.oldPassword) {
+    const data: { password?: string; role?: UpdateUserDto['role'] } = {};
+
+    if (dto.oldPassword || dto.newPassword) {
+      if (!dto.oldPassword || !dto.newPassword) {
+        throw new BadRequestException(
+          'Both oldPassword and newPassword are required',
+        );
+      }
+      const passwordMatches = await bcrypt.compare(
+        dto.oldPassword,
+        user.password,
+      );
+      if (!passwordMatches) {
         throw new ForbiddenException('Old password is wrong');
       }
-      const updatedUser = await this.prisma.user.update({
-        where: { id },
-        data: {
-          password: dto.newPassword,
-        },
-      });
-
-      delete (updatedUser as any).password;
-      return updatedUser;
+      data.password = await this.hashPassword(dto.newPassword);
     }
+
+    if (dto.role) {
+      data.role = dto.role;
+    }
+
+    if (!Object.keys(data).length) {
+      throw new BadRequestException('No valid fields to update');
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id },
+      data,
+    });
+
+    return this.removePassword(updatedUser);
   }
 
   async remove(id: string) {
-    const user = await this.prisma.user.findUnique({ where: { id } });
+    const user = await this.findById(id);
     if (!user) throw new NotFoundException('User not found');
 
-    return await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       await tx.article.updateMany({
         where: { authorId: id },
         data: { status: 'ARCHIVED' },
       });
-      return await tx.user.delete({ where: { id } });
+      await tx.user.delete({ where: { id } });
     });
+  }
+
+  async findById(id: string) {
+    return this.prisma.user.findUnique({
+      where: { id },
+    });
+  }
+
+  async findByLogin(login: string) {
+    return this.prisma.user.findFirst({
+      where: { login },
+    });
+  }
+
+  private async hashPassword(password: string) {
+    const saltRounds = Number(process.env.CRYPT_SALT || 10);
+    return bcrypt.hash(password, saltRounds);
+  }
+
+  private removePassword<T extends { password?: string }>(
+    user: T,
+  ): Omit<T, 'password'> {
+    const safeUser = { ...user };
+    delete safeUser.password;
+    return safeUser;
   }
 }

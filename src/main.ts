@@ -43,6 +43,8 @@ async function bootstrap() {
     .setTitle('Knowledge Hub API')
     .setDescription('The Knowledge Hub API description')
     .setVersion('1.0')
+    .addBearerAuth()
+    .addTag('auth')
     .addTag('users')
     .addTag('articles')
     .addTag('categories')
