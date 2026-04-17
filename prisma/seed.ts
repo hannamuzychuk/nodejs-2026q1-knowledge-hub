@@ -4,6 +4,13 @@ const prisma = new PrismaClient();
     console.log('🌱 Start seeding...');
 
 async function main() {
+    // Make seeding idempotent: clear existing data before inserting fixtures.
+    await prisma.comment.deleteMany();
+    await prisma.article.deleteMany();
+    await prisma.category.deleteMany();
+    await prisma.user.deleteMany();
+    await prisma.tag.deleteMany();
+
     const admin = await prisma.user.create({
         data: {
             login: 'admin',

