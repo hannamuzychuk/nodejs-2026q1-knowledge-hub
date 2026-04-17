@@ -51,23 +51,25 @@ const buildIpRateLimiter = (config: RateLimitConfig) => {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.use(
-    '/auth/signup',
-    buildIpRateLimiter({
-      windowMs: 60_000,
-      maxRequests: 3,
-      message: 'Too many signup attempts. Try again in a minute.',
-    }),
-  );
+  if (process.env.NODE_ENV === 'production') {
+    app.use(
+      '/auth/signup',
+      buildIpRateLimiter({
+        windowMs: 60_000,
+        maxRequests: 3,
+        message: 'Too many signup attempts. Try again in a minute.',
+      }),
+    );
 
-  app.use(
-    '/auth/login',
-    buildIpRateLimiter({
-      windowMs: 60_000,
-      maxRequests: 5,
-      message: 'Too many login attempts. Try again in a minute.',
-    }),
-  );
+    app.use(
+      '/auth/login',
+      buildIpRateLimiter({
+        windowMs: 60_000,
+        maxRequests: 5,
+        message: 'Too many login attempts. Try again in a minute.',
+      }),
+    );
+  }
 
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 

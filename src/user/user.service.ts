@@ -54,6 +54,10 @@ export class UserService {
   }
 
   async update(id: string, dto: UpdateUserDto) {
+    if (!dto.oldPassword && !dto.newPassword && !dto.role) {
+      throw new BadRequestException('No valid fields to update');
+    }
+
     const user = await this.findById(id);
     if (!user) throw new NotFoundException('User not found');
 
@@ -77,10 +81,6 @@ export class UserService {
 
     if (dto.role) {
       data.role = dto.role;
-    }
-
-    if (!Object.keys(data).length) {
-      throw new BadRequestException('No valid fields to update');
     }
 
     const updatedUser = await this.prisma.user.update({
