@@ -1,252 +1,174 @@
-## 🚀 Key Features
+## Knowledge Hub API
 
-*   **👤 User Management**: CRUD operations with role-based attributes (`admin`, `editor`, `viewer`).
+NestJS REST API for users, articles, categories, comments, JWT authentication, refresh tokens and role-based authorization.
 
-*   **📝 Article System**: Full lifecycle management with status tracking (`draft`, `published`, `archived`) and tag support.
+## What Is Implemented
 
-*   **📂 Category Organization**: Logical grouping of articles.
+- Modular NestJS architecture (`user`, `article`, `category`, `comment`, `auth`, `prisma`)
+- JWT authentication: `signup`, `login`, `refresh`, `logout`
+- RBAC guard with 3 roles: `admin`, `editor`, `viewer`
+- Global route protection with explicit public routes
+- Input validation via DTO + global `ValidationPipe`
+- PostgreSQL + Prisma persistence
+- Swagger docs at `/doc`
 
-*   **💬 Comment Engine**: Interaction layer for every article.
+## Auth and Security
 
-*   **🔍 Advanced Filtering**: Filter articles by `status`, `categoryId`, or specific `tags`.
+- Public endpoints:
+  - `POST /auth/signup`
+  - `POST /auth/login`
+  - `POST /auth/refresh`
+  - `POST /auth/logout`
+  - `GET /`
+  - `GET /doc`
+- All other routes require `Authorization: Bearer <accessToken>`
+- Access token payload includes:
+  - `userId`
+  - `login`
+  - `role`
+- Logout invalidates refresh token (in-memory revoked token set)
+- Auth rate limiting is enabled in `production` for:
+  - `POST /auth/signup`
+  - `POST /auth/login`
 
-*   **🛡 Data Integrity**: Automated cascading logic on deletions (In-memory implementation).
+## Role Rules (RBAC)
 
-*   **✅ Validation**: Strict DTO validation using `class-validator` and global `ValidationPipe`.
+- `admin`: full access to all resources
+- `viewer`: read-only (`GET`)
+- `editor`:
+  - can create/update own articles and comments
+  - cannot manage categories
+  - cannot change other users
+  - cannot change roles
 
-*   **📖 Documentation**: Auto-generated interactive OpenAPI (Swagger) documentation.
+## Tech Stack
 
+- NestJS 10
+- TypeScript
+- Prisma ORM
+- PostgreSQL 16
+- Swagger / OpenAPI
+- class-validator / class-transformer
+- Docker / Docker Compose
 
----
+## Environment Setup
 
-## 🛠 Tech Stack
+Create `.env` from `.env.example` and set at minimum:
 
-| Component | Technology |
-| :--- | :--- |
-| **Framework** | [Nest.js](https://nestjs.com/) (Modular Architecture) |
-| **Language** | TypeScript |
-| **Documentation** | Swagger / OpenAPI 3.0 |
-| **Validation** | class-validator & class-transformer |
-| **Database** | PostgreSQL 16 (Dockerized) |
-| **Containerization** | Docker & Docker Compose |
-| **ORM** |   Prisma    |
-| **Database**  | PostgreSQL 16 |
+```env
+PORT=4000
+CRYPT_SALT=10
 
+JWT_SECRET=your_access_token_secret
+JWT_REFRESH_SECRET=your_refresh_token_secret
+JWT_ACCESS_TTL=15m
+JWT_REFRESH_TTL=7d
 
----
-
-## 🐳 Docker Quick Start (Recommended)
-
-The easiest way to run the application is using Docker.
-
-**Docker Hub Image:** [https://hub.docker.com/r/hannamuzychuk/knowledge-hub-api](https://hub.docker.com/r/hannamuzychuk/knowledge-hub-api)
-
-1. **Configure environment:**
-   Create a `.env` file based on `.env.example`.
-
-2. **Run the entire stack:**
-   ```bash
-   docker compose up --build
-
----
-## Access the app:
-
-API: http://localhost:4000
-
-Swagger UI: http://localhost:4000/doc
-
-Adminer (Database UI): 
-
-Run with 
-
+POSTGRES_USER=admin
+POSTGRES_PASSWORD=password123
+POSTGRES_DB=knowledge_hub
+POSTGRES_PORT=5432
+DATABASE_URL="postgresql://admin:password123@localhost:5432/knowledge_hub?schema=public&connection_limit=10"
 ```
-docker compose --profile debug up 
+
+## Local Run (without Docker app container)
+
+1. Start Postgres:
+
+```bash
+docker compose up -d db
 ```
 
+2. Install dependencies:
 
-
-and access 
-
-http://localhost:8080
-
----
-
-## 🛡️ Security Audit & Image Optimization (Hacker Scope)
-
-This project has been optimized and audited to meet high security and performance standards.
-
-### 🔍 Security Scan Results
-The production image was scanned using `docker scout cves`.
-
-| Severity | Count | Status |
-| :--- | :---: | :--- |
-| 🔴 **CRITICAL** | **0** | ✅ **Passed** |
-| 🟠 **HIGH** | 36 | Inherited from base image (`node:24-alpine`) |
-| 🟡 **MEDIUM** | 12 | Monitored |
-| 🔵 **LOW** | 4 | Monitored |
-
-> **Audit Note:** No critical vulnerabilities were detected. All high-severity findings originate from the base Alpine system libraries (e.g., `openssl`, `musl`). The application layer is secure, and the attack surface is minimized by running as a **non-root user**.
-
-### 📦 Image Optimization
-* **Final Image Size:** **82 MB** (Requirement: < 500 MB)
-* **Build Strategy:** Multi-stage build (reduces size and hides source code).
-* **Base Image:** `node:24-alpine` (chosen for security and minimal footprint).
-* **Non-Root User:** Executed under `USER node` for enhanced container security.
-
-### 🛠️ Local Debugging (Isolated)
-An optional **Adminer** service is included for database management but is isolated from the standard production flow.
-* **To run with Adminer:** `docker compose --profile debug up`
-* **Access:** [http://localhost:8080](http://localhost:8080)
-
----
-
-## 📊 Database Schema (ERD)
-
-The application uses **PostgreSQL** with the following relations:
-*   **User ↔ Article**: One-to-Many (Author can have multiple articles).
-*   **Category ↔ Article**: One-to-Many (Category contains multiple articles).
-*   **Article ↔ Comment**: One-to-Many (Article has multiple comments).
-*   **User ↔ Comment**: One-to-Many (User writes multiple comments).
-*   **Article ↔ Tag**: Many-to-Many (Articles have multiple tags; tags belong to many articles).
----
-
-## 💎 Prisma ORM Commands
-
-If you need to manage the database manually:
-
-*   **Generate Prisma Client:** `npx prisma generate`
-*   **Run Migrations:** `npx prisma migrate dev`
-*   **Open Prisma Studio (GUI):** `npx prisma studio`
-*   **Seed Database:** `npx prisma db seed`
----
-
-## 🛡️ Data Integrity & Cascading
-- **User Deletion**: Articles are kept (`ON DELETE SET NULL`), while comments are removed (`ON DELETE CASCADE`).
-- **Article Deletion**: All related comments are automatically removed (`ON DELETE CASCADE`).
-- **Category Deletion**: Articles remain in the system but their category reference is cleared (`ON DELETE SET NULL`).
----
-
-## 🌱 Database Seeding
-To populate the database with initial data (users, categories, articles, and tags) for testing, run:
+```bash
+npm install
 ```
+
+3. Prepare database:
+
+```bash
+npx prisma generate
+npx prisma migrate deploy
 npx prisma db seed
 ```
----
-## ⚙️ Installation & Setup
 
-1. **Clone the repository:**
-   ```bash
-   git clone [https://github.com/hannamuzychuk/nodejs-2026q1-knowledge-hub.git](https://github.com/hannamuzychuk/nodejs-2026q1-knowledge-hub.git)
-   cd nodejs-2026q1-knowledge-hub
+4. Start API:
 
-2. **Install dependencies:**
-    ```bash 
-    npm install
+```bash
+npm run start:dev
+```
 
-3. **Configure environment:**
+App URLs:
 
-    Create a .env file in the root directory:
+- API: http://localhost:4000
+- Swagger: http://localhost:4000/doc
 
-    PORT=4000
+## Docker Full Stack
 
---- 
+```bash
+docker compose up --build
+```
 
-## 🏃 Running the Application
+Optional Adminer:
 
-| Mode | Command | URL |
-| :--- | :--- | :--- |
-| **Development** | `npm run start` | [http://localhost:4000](http://localhost:4000) |
-| **Watch Mode** | `npm run start:dev` | [http://localhost:4000](http://localhost:4000) |
-| **Swagger UI** | — | [http://localhost:4000/doc](http://localhost:4000/doc) |
+```bash
+docker compose --profile debug up
+```
 
----
-## 🛣️ API Endpoints Summary
+Adminer URL: http://localhost:8080
 
-### 👤 Users (`/user`)
-*   **GET** `/user` – List all users (passwords excluded).
-*   **GET** `/user/:id` – Get user details by UUID.
-*   **POST** `/user` – Create a new user.
-*   **PUT** `/user/:id` – Update user password (requires `oldPassword`).
-*   **DELETE** `/user/:id` – Delete user.
-    > **Cascade:** Nullifies author in articles and removes related comments.
+## Testing
 
-### 📝 Articles (`/article`)
-*   **GET** `/article` – List articles (Query params: `status`, `categoryId`, `tag`).
-*   **POST** `/article` – Create a new article.
-*   **DELETE** `/article/:id` – Delete article.
-    > **Cascade:** Removes all related comments.
+Important: E2E tests in this project send HTTP requests to `localhost:4000`, so API must be running while tests execute.
 
-### 📂 Categories (`/category`)
-*   **GET** `/category` – List all categories.
-*   **POST** `/category` – Create a category.
-*   **DELETE** `/category/:id` – Delete category.
-    > **Cascade:** Nullifies category reference in related articles.
+Recommended commands for this branch:
 
-### 💬 Comments (`/comment`)
-*   **GET** `/comment?articleId={id}` – Get comments for a specific article.
-*   **POST** `/comment` – Add a new comment (validates `articleId` existence).
----
+```bash
+npm run test:auth
+npm run test:refresh
+npm run test:rbac
+```
 
-## 🧹 Quality & Testing
-To maintain high code standards and verify requirements:
+Additional:
 
-Bash
-# Run Linter (ESLint)
+```bash
 npm run lint
-
-Bash
-# Run Automated Test Suite
-
+npm run build
 npm run test
+```
 
----
-## 📜 Assignment Details
-This project was developed as part of the Node.js 2026 Q1 course. It adheres to the requirements of modular architecture, dependency injection, and strict input validation.
+## Prisma Commands
 
-Requirements met:
- - Modular separation of concerns (Users, Articles, Categories, Comments).
+```bash
+npx prisma generate
+npx prisma migrate dev
+npx prisma migrate deploy
+npx prisma db seed
+npx prisma studio
+```
 
- - Persistent data management with **PostgreSQL** and **Prisma ORM**..
+## Data Integrity Rules
 
-- DTO-based validation and auto-generated Swagger docs.
+- User deletion:
+  - user comments -> cascade delete
+  - article `authorId` -> set `null`
+- Article deletion:
+  - related comments -> cascade delete
+- Category deletion:
+  - article `categoryId` -> set `null`
 
-- Correct cascading behavior for entity deletion.
----
-
-## 📂 Project Structure
+## Project Structure
 
 ```text
-
-NODEJS-2026Q1-KNOWLEDGE-HUB
-├── doc/                # API Documentation (api.yaml)
-├── prisma 
-|   ├──migtarions
-|   ├──schema.prisma
-|   ├──seed.ts
-├── src/                 # Application source code
-│   ├── article/         # Article module, controller, and service
-│   ├── category/        # Category module, controller, and service
-│   ├── comment/         # Comment module, controller, and service
-│   ├── db/              # In-memory database logic
-│   ├── prisma/          # Prisma ORM logic
-│   ├── user/            # User module, controller, and service
-│   ├── app.controller.ts
-│   ├── app.module.ts
-│   ├── app.service.ts
-│   └── main.ts          # Application entry point
-├── test/                # E2E and Unit tests   
-├── .dockerignore        
-├── .env.example         # Template for environment variables
-├── .eslintrc.js         # Linter configuration
-├── .gitignore
-├── .docker-compose.yml   # Containerization configuration
-├──  Dockerfile 
-├── .prettierrc          # Formatter configuration
-├── jest.config.json     # Test runner configuration
-├── nest-cli.json        # Nest CLI configuration
-├── package.json         # Dependencies and scripts
-├── README.md            # Project documentation
-├── tsconfig.build.json
-└── tsconfig.json        # TypeScript configuration
-
-
+src/
+  auth/
+  user/
+  article/
+  category/
+  comment/
+  prisma/
+test/
+prisma/
+README.md
+```
