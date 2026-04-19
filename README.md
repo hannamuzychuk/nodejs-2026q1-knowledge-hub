@@ -105,6 +105,15 @@ App URLs:
 - API: http://localhost:4000
 - Swagger: http://localhost:4000/doc
 
+## Render Deploy Notes
+
+- Runtime: Node `24.10.0` (pinned in `package.json` and `.nvmrc`)
+- Build command: `npm ci && npx prisma generate && npm run build`
+- Start command: `npx prisma migrate deploy && node dist/src/main.js`
+- Required env on the Render **Web Service**:
+  - `DATABASE_URL` must be a real Postgres URL (`postgresql://...`), never `localhost`
+  - `JWT_SECRET`, `JWT_REFRESH_SECRET`, `CRYPT_SALT`
+
 ## Docker Full Stack
 
 ```bash
