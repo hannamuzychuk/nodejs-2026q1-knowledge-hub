@@ -1,84 +1,190 @@
-# Knowledge Hub
+## Knowledge Hub API
 
-## Prerequisites
+NestJS REST API for users, articles, categories, comments, JWT authentication, refresh tokens and role-based authorization.
 
-- Git - [Download & Install Git](https://git-scm.com/downloads).
-- Node.js - [Download & Install Node.js](https://nodejs.org/en/download/) and the npm package manager.
+## What Is Implemented
 
-## Downloading
+- Modular NestJS architecture (`user`, `article`, `category`, `comment`, `auth`, `prisma`)
+- JWT authentication: `signup`, `login`, `refresh`, `logout`
+- RBAC guard with 3 roles: `admin`, `editor`, `viewer`
+- Global route protection with explicit public routes
+- Input validation via DTO + global `ValidationPipe`
+- PostgreSQL + Prisma persistence
+- Swagger docs at `/doc`
 
+## Auth and Security
+
+- Public endpoints (no access token):
+  - `POST /auth/signup`
+  - `POST /auth/login`
+  - `POST /auth/refresh`
+  - `GET /`
+  - `GET /doc`
+- `POST /auth/logout` requires `Authorization: Bearer <accessToken>` and body `{ "refreshToken": "<refresh>" }` to revoke the refresh token.
+- All other routes require `Authorization: Bearer <accessToken>`
+- Access token payload includes:
+  - `userId`
+  - `login`
+  - `role`
+- Logout invalidates refresh token (in-memory revoked token set)
+- Auth rate limiting (per IP, sliding window) is always enabled for:
+  - `POST /auth/signup`
+  - `POST /auth/login`
+  - In `NODE_ENV=production`: 3 signups / 5 logins per IP per minute. Outside production, limits are higher so local e2e (many test files signing up in a row) is not rejected with HTTP 429.
+
+## Role Rules (RBAC)
+
+- `admin`: full access to all resources
+- `viewer`: read-only (`GET`)
+- `editor`:
+  - can create/update own articles and comments
+  - cannot manage categories
+  - cannot change other users
+  - cannot change roles
+
+## Tech Stack
+
+- NestJS 10
+- TypeScript
+- Prisma ORM
+- PostgreSQL 16
+- Swagger / OpenAPI
+- class-validator / class-transformer
+- Docker / Docker Compose
+
+## Environment Setup
+
+Create `.env` from `.env.example` and set at minimum:
+
+```env
+PORT=4000
+CRYPT_SALT=10
+
+JWT_SECRET=your_access_token_secret
+JWT_REFRESH_SECRET=your_refresh_token_secret
+JWT_ACCESS_TTL=15m
+JWT_REFRESH_TTL=7d
+
+POSTGRES_USER=admin
+POSTGRES_PASSWORD=password123
+POSTGRES_DB=knowledge_hub
+POSTGRES_PORT=5432
+DATABASE_URL="postgresql://admin:password123@localhost:5432/knowledge_hub?schema=public&connection_limit=10"
 ```
-git clone {repository URL}
+
+## Local Run (without Docker app container)
+
+1. Start Postgres:
+
+```bash
+docker compose up -d db
 ```
 
-## Installing NPM modules
+2. Install dependencies:
 
-```
+```bash
 npm install
 ```
 
-## Running application
+3. Prepare database:
 
-```
-npm start
+```bash
+npx prisma generate
+npx prisma migrate deploy
+npx prisma db seed
 ```
 
-After starting the app on port (4000 as default) you can open
-in your browser OpenAPI documentation by typing http://localhost:4000/doc/.
-For more information about OpenAPI/Swagger please visit https://swagger.io/.
+4. Start API:
+
+```bash
+npm run start:dev
+```
+
+App URLs:
+
+- API: http://localhost:4000
+- Swagger: http://localhost:4000/doc
+
+## Render Deploy Notes
+
+- Runtime: Node `24.10.0` (pinned in `package.json` and `.nvmrc`)
+- Build command: `npm ci && npx prisma generate && npm run build`
+- Start command: `npx prisma migrate deploy && node dist/src/main.js`
+- Required env on the Render **Web Service**:
+  - `DATABASE_URL` must be a real Postgres URL (`postgresql://...`), never `localhost`
+  - `JWT_SECRET`, `JWT_REFRESH_SECRET`, `CRYPT_SALT`
+
+## Docker Full Stack
+
+```bash
+docker compose up --build
+```
+
+The `app` service overrides `DATABASE_URL` to use hostname **`db`** (the Postgres service on the Compose network). Your `.env` can keep `localhost` for local runs without Docker; `docker compose` still injects the correct URL for the container.
+
+Optional Adminer:
+
+```bash
+docker compose --profile debug up
+```
+
+Adminer URL: http://localhost:8080
 
 ## Testing
 
-After application running open new terminal and enter:
+Important: E2E tests in this project send HTTP requests to `localhost:4000`, so API must be running while tests execute.
 
-To run all tests without authorization
+For `npm run test:auth`, `test:refresh`, and `test:rbac`, the Jest process sets `JWT_SECRET` and `JWT_SECRET_REFRESH_KEY`. The **running API must use the same values** (in `.env` or the shell that starts `npm run start:dev`), otherwise login/refresh checks and tests that mint JWTs will fail.
 
-```
-npm run test
-```
+The e2e fixture user `TEST_AUTH_LOGIN` is promoted to admin **when the API is not in `NODE_ENV=production`**, so Jest does not need to pass `TEST_MODE` into the server process for local runs. In production, that login behaves like a normal user unless you explicitly set `TEST_MODE=auth` on the server (e.g. CI).
 
-To run only one of all test suites
+Recommended commands for this branch:
 
-```
-npm run test -- <path to suite>
-```
-
-To run all test with authorization
-
-```
+```bash
 npm run test:auth
-```
-
-To run only specific test suite with authorization
-
-```
-npm run test:auth -- <path to suite>
-```
-
-To run refresh token tests
-
-```
 npm run test:refresh
-```
-
-To run RBAC (role-based access control) tests
-
-```
 npm run test:rbac
 ```
 
-### Auto-fix and format
+Additional:
 
-```
+```bash
 npm run lint
+npm run build
+npm run test
 ```
 
+## Prisma Commands
+
+```bash
+npx prisma generate
+npx prisma migrate dev
+npx prisma migrate deploy
+npx prisma db seed
+npx prisma studio
 ```
-npm run format
+
+## Data Integrity Rules
+
+- User deletion:
+  - user comments -> cascade delete
+  - article `authorId` -> set `null`
+- Article deletion:
+  - related comments -> cascade delete
+- Category deletion:
+  - article `categoryId` -> set `null`
+
+## Project Structure
+
+```text
+src/
+  auth/
+  user/
+  article/
+  category/
+  comment/
+  prisma/
+test/
+prisma/
+README.md
 ```
-
-### Debugging in VSCode
-
-Press <kbd>F5</kbd> to debug.
-
-For more information, visit: https://code.visualstudio.com/docs/editor/debugging
