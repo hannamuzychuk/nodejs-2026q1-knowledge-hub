@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../prisma/prisma.service';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { getJwtAccessSecret } from '../jwt-secrets.util';
 import { AuthUser } from '../types/auth-user.type';
 
 @Injectable()
@@ -44,7 +45,7 @@ export class JwtRbacGuard implements CanActivate {
     let payload: AuthUser;
     try {
       payload = await this.jwtService.verifyAsync<AuthUser>(token, {
-        secret: this.getAccessSecret(),
+        secret: getJwtAccessSecret(),
       });
     } catch {
       throw new UnauthorizedException('Access token is invalid or expired');
@@ -239,12 +240,6 @@ export class JwtRbacGuard implements CanActivate {
     }
 
     throw new ForbiddenException('Insufficient permissions');
-  }
-
-  private getAccessSecret() {
-    return (
-      process.env.JWT_SECRET || process.env.JWT_SECRET_KEY || 'access_secret'
-    );
   }
 
   private getBasePath(path: string): string {

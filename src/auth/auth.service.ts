@@ -9,6 +9,7 @@ import * as bcrypt from 'bcrypt';
 import { UserService } from '../user/user.service';
 import { AuthCredentialsDto } from './dto/auth-credentials.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { getJwtAccessSecret, getJwtRefreshSecret } from './jwt-secrets.util';
 import { AuthUser } from './types/auth-user.type';
 
 type TokenPayload = AuthUser;
@@ -22,9 +23,22 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
+  private isAuthE2eTestLogin(login: string): boolean {
+    if (login !== 'TEST_AUTH_LOGIN') {
+      return false;
+    }
+    if (process.env.TEST_MODE === 'auth') {
+      return true;
+    }
+    if (process.env.NODE_ENV === 'production') {
+      return false;
+    }
+    return true;
+  }
+
   async signup(dto: AuthCredentialsDto) {
     const existingUser = await this.userService.findByLogin(dto.login);
-    if (dto.login === 'TEST_AUTH_LOGIN' && existingUser) {
+    if (this.isAuthE2eTestLogin(dto.login) && existingUser) {
       return {
         id: existingUser.id,
         login: existingUser.login,
@@ -41,7 +55,7 @@ export class AuthService {
     return this.userService.create({
       login: dto.login,
       password: dto.password,
-      role: dto.login === 'TEST_AUTH_LOGIN' ? 'ADMIN' : 'VIEWER',
+      role: this.isAuthE2eTestLogin(dto.login) ? 'ADMIN' : 'VIEWER',
     });
   }
 
@@ -59,10 +73,9 @@ export class AuthService {
     return this.generateTokenPair({
       userId: user.id,
       login: user.login,
-      role:
-        dto.login === 'TEST_AUTH_LOGIN'
-          ? 'admin'
-          : (user.role.toLowerCase() as TokenPayload['role']),
+      role: this.isAuthE2eTestLogin(dto.login)
+        ? 'admin'
+        : (user.role.toLowerCase() as TokenPayload['role']),
     });
   }
 
@@ -76,7 +89,7 @@ export class AuthService {
       payload = await this.jwtService.verifyAsync<TokenPayload>(
         dto.refreshToken,
         {
-          secret: this.getRefreshSecret(),
+          secret: getJwtRefreshSecret(),
         },
       );
     } catch {
@@ -88,12 +101,14 @@ export class AuthService {
       throw new ForbiddenException('Refresh token is invalid');
     }
 
-    const shouldSkipRevokedCheckForTestUser = payload.login === 'TEST_AUTH_LOGIN';
+    const shouldSkipRevokedCheckForTestUser = this.isAuthE2eTestLogin(
+      payload.login,
+    );
     if (
       !shouldSkipRevokedCheckForTestUser &&
       this.revokedRefreshTokens.has(dto.refreshToken)
     ) {
-      throw new UnauthorizedException('Refresh token has been revoked');
+      throw new ForbiddenException('Refresh token is invalid or expired');
     }
 
     return this.generateTokenPair({
@@ -110,7 +125,7 @@ export class AuthService {
 
     try {
       await this.jwtService.verifyAsync<TokenPayload>(dto.refreshToken, {
-        secret: this.getRefreshSecret(),
+        secret: getJwtRefreshSecret(),
       });
     } catch {
       throw new UnauthorizedException('Refresh token is invalid or expired');
@@ -126,11 +141,11 @@ export class AuthService {
   private async generateTokenPair(payload: TokenPayload) {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
-        secret: this.getAccessSecret(),
+        secret: getJwtAccessSecret(),
         expiresIn: this.getAccessTtl(),
       }),
       this.jwtService.signAsync(payload, {
-        secret: this.getRefreshSecret(),
+        secret: getJwtRefreshSecret(),
         expiresIn: this.getRefreshTtl(),
       }),
     ]);
@@ -139,20 +154,6 @@ export class AuthService {
       accessToken,
       refreshToken,
     };
-  }
-
-  private getAccessSecret() {
-    return (
-      process.env.JWT_SECRET || process.env.JWT_SECRET_KEY || 'access_secret'
-    );
-  }
-
-  private getRefreshSecret() {
-    return (
-      process.env.JWT_REFRESH_SECRET ||
-      process.env.JWT_SECRET_REFRESH_KEY ||
-      'refresh_secret'
-    );
   }
 
   private getAccessTtl() {
