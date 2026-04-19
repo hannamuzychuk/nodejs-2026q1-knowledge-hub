@@ -1,5 +1,5 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Public } from './decorators/public.decorator';
 import { AuthService } from './auth.service';
 import { AuthCredentialsDto } from './dto/auth-credentials.dto';
@@ -30,7 +30,7 @@ export class AuthController {
     return this.authService.refresh(dto);
   }
 
-  @Public()
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @Post('logout')
   logout(@Body() dto: RefreshTokenDto) {

@@ -8,6 +8,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { NextFunction, Request, Response } from 'express';
+import { assertJwtEnvConfigured } from './auth/jwt-secrets.util';
 
 dotenv.config();
 
@@ -49,27 +50,29 @@ const buildIpRateLimiter = (config: RateLimitConfig) => {
 };
 
 async function bootstrap() {
+  assertJwtEnvConfigured();
+
   const app = await NestFactory.create(AppModule);
 
-  if (process.env.NODE_ENV === 'production') {
-    app.use(
-      '/auth/signup',
-      buildIpRateLimiter({
-        windowMs: 60_000,
-        maxRequests: 3,
-        message: 'Too many signup attempts. Try again in a minute.',
-      }),
-    );
+  const isProduction = process.env.NODE_ENV === 'production';
 
-    app.use(
-      '/auth/login',
-      buildIpRateLimiter({
-        windowMs: 60_000,
-        maxRequests: 5,
-        message: 'Too many login attempts. Try again in a minute.',
-      }),
-    );
-  }
+  app.use(
+    '/auth/signup',
+    buildIpRateLimiter({
+      windowMs: 60_000,
+      maxRequests: isProduction ? 3 : 60,
+      message: 'Too many signup attempts. Try again in a minute.',
+    }),
+  );
+
+  app.use(
+    '/auth/login',
+    buildIpRateLimiter({
+      windowMs: 60_000,
+      maxRequests: isProduction ? 5 : 120,
+      message: 'Too many login attempts. Try again in a minute.',
+    }),
+  );
 
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 

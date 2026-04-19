@@ -14,22 +14,23 @@ NestJS REST API for users, articles, categories, comments, JWT authentication, r
 
 ## Auth and Security
 
-- Public endpoints:
+- Public endpoints (no access token):
   - `POST /auth/signup`
   - `POST /auth/login`
   - `POST /auth/refresh`
-  - `POST /auth/logout`
   - `GET /`
   - `GET /doc`
+- `POST /auth/logout` requires `Authorization: Bearer <accessToken>` and body `{ "refreshToken": "<refresh>" }` to revoke the refresh token.
 - All other routes require `Authorization: Bearer <accessToken>`
 - Access token payload includes:
   - `userId`
   - `login`
   - `role`
 - Logout invalidates refresh token (in-memory revoked token set)
-- Auth rate limiting is enabled in `production` for:
+- Auth rate limiting (per IP, sliding window) is always enabled for:
   - `POST /auth/signup`
   - `POST /auth/login`
+  - In `NODE_ENV=production`: 3 signups / 5 logins per IP per minute. Outside production, limits are higher so local e2e (many test files signing up in a row) is not rejected with HTTP 429.
 
 ## Role Rules (RBAC)
 
@@ -110,6 +111,8 @@ App URLs:
 docker compose up --build
 ```
 
+The `app` service overrides `DATABASE_URL` to use hostname **`db`** (the Postgres service on the Compose network). Your `.env` can keep `localhost` for local runs without Docker; `docker compose` still injects the correct URL for the container.
+
 Optional Adminer:
 
 ```bash
@@ -121,6 +124,10 @@ Adminer URL: http://localhost:8080
 ## Testing
 
 Important: E2E tests in this project send HTTP requests to `localhost:4000`, so API must be running while tests execute.
+
+For `npm run test:auth`, `test:refresh`, and `test:rbac`, the Jest process sets `JWT_SECRET` and `JWT_SECRET_REFRESH_KEY`. The **running API must use the same values** (in `.env` or the shell that starts `npm run start:dev`), otherwise login/refresh checks and tests that mint JWTs will fail.
+
+The e2e fixture user `TEST_AUTH_LOGIN` is promoted to admin **when the API is not in `NODE_ENV=production`**, so Jest does not need to pass `TEST_MODE` into the server process for local runs. In production, that login behaves like a normal user unless you explicitly set `TEST_MODE=auth` on the server (e.g. CI).
 
 Recommended commands for this branch:
 
