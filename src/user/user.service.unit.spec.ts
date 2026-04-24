@@ -1,92 +1,113 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { compare, hash } from 'bcrypt';
+import { vi } from 'vitest';
 import { UserService } from './user.service';
-import { DbService } from 'src/db/db.service';
-import { UserRole } from './entities/user.entity';
+import { PrismaService } from '../prisma/prisma.service';
+
+vi.mock('bcrypt', () => ({
+  compare: vi.fn(),
+  hash: vi.fn(),
+}));
 
 describe('UserService', () => {
   let service: UserService;
-  let db: DbService;
+  const prisma = {
+    user: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    article: { updateMany: vi.fn() },
+    $transaction: vi.fn(),
+  };
 
   beforeEach(async () => {
+    vi.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
-      providers: [UserService, DbService],
+      providers: [
+        {
+          provide: UserService,
+          useFactory: () => new UserService(prisma as any),
+        },
+        {
+          provide: PrismaService,
+          useValue: prisma,
+        },
+      ],
     }).compile();
-
     service = module.get(UserService);
-    db = module.get(DbService);
   });
 
-  it('creates user with default viewer role and hidden password', () => {
-    const created = service.create({ login: 'john', password: 'secret123' });
-
-    expect(created.role).toBe(UserRole.VIEWER);
-    expect(created).not.toHaveProperty('password');
-    expect(db.users).toHaveLength(1);
-  });
-
-  it('keeps explicitly provided role', () => {
-    const created = service.create({
-      login: 'admin-user',
-      password: 'secret123',
-      role: UserRole.ADMIN,
+  it('hashes password, sets default role and strips password on create', async () => {
+    prisma.user.findFirst.mockResolvedValue(null);
+    prisma.user.create.mockResolvedValue({
+      id: 'u1',
+      login: 'john',
+      password: 'hashed-pass',
+      role: 'VIEWER',
     });
+    vi.mocked(hash).mockResolvedValue('hashed-pass' as never);
 
-    expect(created.role).toBe(UserRole.ADMIN);
+    const created = await service.create({ login: 'john', password: 'secret123' });
+
+    expect(prisma.user.create).toHaveBeenCalledWith({
+      data: { login: 'john', password: 'hashed-pass', role: 'VIEWER' },
+    });
+    expect(created).toEqual({ id: 'u1', login: 'john', role: 'VIEWER' });
   });
 
-  it('throws not found when user does not exist', () => {
-    expect(() => service.findOne('missing-id')).toThrow(NotFoundException);
+  it('throws bad request when login already exists', async () => {
+    prisma.user.findFirst.mockResolvedValue({ id: 'u1', login: 'john' });
+
+    await expect(service.create({ login: 'john', password: 'secret123' })).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
-  it('throws bad request when update password payload is incomplete', () => {
-    const created = service.create({ login: 'john', password: 'secret123' });
-
-    expect(() =>
-      service.update(created.id, { oldPassword: 'secret123' }),
-    ).toThrow(BadRequestException);
+  it('throws not found on findOne for missing user', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    await expect(service.findOne('missing')).rejects.toThrow(NotFoundException);
   });
 
-  it('throws forbidden when old password is wrong', () => {
-    const created = service.create({ login: 'john', password: 'secret123' });
+  it('throws forbidden on update when old password does not match', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'u1',
+      login: 'john',
+      password: 'hashed-pass',
+      role: 'VIEWER',
+    });
+    vi.mocked(compare).mockResolvedValue(false as never);
 
-    expect(() =>
-      service.update(created.id, {
-        oldPassword: 'wrong-pass',
-        newPassword: 'newSecret',
+    await expect(
+      service.update('u1', { oldPassword: 'wrong', newPassword: 'new-secret' }),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('throws bad request on update when only one password field is provided', async () => {
+    await expect(service.update('u1', { oldPassword: 'old-only' })).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('archives user articles then deletes user on remove', async () => {
+    prisma.user.findUnique.mockResolvedValue({ id: 'u1', login: 'john' });
+    prisma.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        article: { updateMany: prisma.article.updateMany },
+        user: { delete: prisma.user.delete },
       }),
-    ).toThrow(ForbiddenException);
-  });
+    );
 
-  it('removes user and clears user relations', () => {
-    const created = service.create({ login: 'john', password: 'secret123' });
-    db.articles.push({
-      id: 'a1',
-      title: 'title',
-      content: 'content',
-      status: 'draft',
-      authorId: created.id,
-      categoryId: null,
-      tags: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+    await service.remove('u1');
+
+    expect(prisma.article.updateMany).toHaveBeenCalledWith({
+      where: { authorId: 'u1' },
+      data: { status: 'ARCHIVED' },
     });
-    db.comments.push({
-      id: 'c1',
-      content: 'content',
-      articleId: 'a1',
-      authorId: created.id,
-      createdAt: Date.now(),
-    });
-
-    service.remove(created.id);
-
-    expect(db.users).toHaveLength(0);
-    expect(db.articles[0].authorId).toBeNull();
-    expect(db.comments).toHaveLength(0);
+    expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: 'u1' } });
   });
 });
