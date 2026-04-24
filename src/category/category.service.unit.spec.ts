@@ -1,56 +1,70 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
+import { vi } from 'vitest';
 import { CategoryService } from './category.service';
-import { DbService } from 'src/db/db.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 describe('CategoryService', () => {
   let service: CategoryService;
-  let db: DbService;
+  const prisma = {
+    category: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    article: { updateMany: vi.fn() },
+  };
 
   beforeEach(async () => {
+    vi.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
-      providers: [CategoryService, DbService],
+      providers: [
+        {
+          provide: CategoryService,
+          useFactory: () => new CategoryService(prisma as any),
+        },
+        { provide: PrismaService, useValue: prisma },
+      ],
     }).compile();
 
     service = module.get(CategoryService);
-    db = module.get(DbService);
   });
 
-  it('creates category and returns it', () => {
-    const created = service.create({ name: 'Tech', description: 'desc' });
+  it('creates category with provided data', async () => {
+    prisma.category.create.mockResolvedValue({ id: 'cat1', name: 'Tech' });
+    const created = await service.create({ name: 'Tech', description: 'desc' });
 
     expect(created.name).toBe('Tech');
-    expect(db.categories).toHaveLength(1);
+    expect(prisma.category.create).toHaveBeenCalledWith({
+      data: { name: 'Tech', description: 'desc' },
+    });
   });
 
-  it('throws not found for missing category', () => {
-    expect(() => service.findOne('missing')).toThrow(NotFoundException);
+  it('throws not found for missing category', async () => {
+    prisma.category.findUnique.mockResolvedValue(null);
+    await expect(service.findOne('missing')).rejects.toThrow(NotFoundException);
   });
 
-  it('updates category fields', () => {
-    const created = service.create({ name: 'Tech', description: 'desc' });
-    const updated = service.update(created.id, { description: 'new-desc' });
+  it('updates category fields', async () => {
+    prisma.category.findUnique.mockResolvedValue({ id: 'cat1' });
+    prisma.category.update.mockResolvedValue({ id: 'cat1', description: 'new-desc' });
+    const updated = await service.update('cat1', { description: 'new-desc' });
 
     expect(updated.description).toBe('new-desc');
   });
 
-  it('removes category and nulls categoryId in articles', () => {
-    const created = service.create({ name: 'Tech', description: 'desc' });
-    db.articles.push({
-      id: 'a1',
-      title: 't',
-      content: 'c',
-      status: 'draft',
-      authorId: null,
-      categoryId: created.id,
-      tags: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+  it('removes category and nulls categoryId in related articles', async () => {
+    prisma.category.findUnique.mockResolvedValue({ id: 'cat1' });
+    prisma.category.delete.mockResolvedValue({ id: 'cat1' });
+
+    await service.remove('cat1');
+
+    expect(prisma.article.updateMany).toHaveBeenCalledWith({
+      where: { categoryId: 'cat1' },
+      data: { categoryId: null },
     });
-
-    service.remove(created.id);
-
-    expect(db.categories).toHaveLength(0);
-    expect(db.articles[0].categoryId).toBeNull();
+    expect(prisma.category.delete).toHaveBeenCalledWith({ where: { id: 'cat1' } });
   });
 });

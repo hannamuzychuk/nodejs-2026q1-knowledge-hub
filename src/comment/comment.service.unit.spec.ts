@@ -3,68 +3,76 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { vi } from 'vitest';
 import { CommentService } from './comment.service';
-import { DbService } from 'src/db/db.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 describe('CommentService', () => {
   let service: CommentService;
-  let db: DbService;
+  const prisma = {
+    article: { findUnique: vi.fn() },
+    user: { findUnique: vi.fn() },
+    comment: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+  };
 
   beforeEach(async () => {
+    vi.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
-      providers: [CommentService, DbService],
+      providers: [
+        {
+          provide: CommentService,
+          useFactory: () => new CommentService(prisma as any),
+        },
+        { provide: PrismaService, useValue: prisma },
+      ],
     }).compile();
 
     service = module.get(CommentService);
-    db = module.get(DbService);
   });
 
-  it('creates comment for existing article', () => {
-    db.articles.push({
-      id: 'a1',
-      title: 't',
-      content: 'c',
-      status: 'draft',
-      authorId: null,
-      categoryId: null,
-      tags: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    });
+  it('creates comment for existing article', async () => {
+    prisma.article.findUnique.mockResolvedValue({ id: 'a1' });
+    prisma.comment.create.mockResolvedValue({ id: 'c1', articleId: 'a1' });
 
-    const created = service.create({ content: 'Nice', articleId: 'a1' });
+    const created = await service.create({ content: 'Nice', articleId: 'a1' });
 
     expect(created.articleId).toBe('a1');
-    expect(db.comments).toHaveLength(1);
+    expect(prisma.comment.create).toHaveBeenCalledWith({
+      data: { content: 'Nice', articleId: 'a1', authorId: undefined },
+    });
   });
 
-  it('throws when article does not exist', () => {
-    expect(() =>
-      service.create({ content: 'Nice', articleId: 'missing' }),
-    ).toThrow(UnprocessableEntityException);
-  });
-
-  it('throws not found for missing comment', () => {
-    expect(() => service.findOne('missing')).toThrow(NotFoundException);
-  });
-
-  it('filters by articleId', () => {
-    db.comments.push(
-      {
-        id: 'c1',
-        content: 'one',
-        articleId: 'a1',
-        createdAt: Date.now(),
-      },
-      {
-        id: 'c2',
-        content: 'two',
-        articleId: 'a2',
-        createdAt: Date.now(),
-      },
+  it('throws when article does not exist', async () => {
+    prisma.article.findUnique.mockResolvedValue(null);
+    await expect(service.create({ content: 'Nice', articleId: 'missing' })).rejects.toThrow(
+      UnprocessableEntityException,
     );
+  });
 
-    expect(service.findAll({ articleId: 'a1' })).toHaveLength(1);
-    expect(service.findAll({})).toHaveLength(2);
+  it('throws when author does not exist', async () => {
+    prisma.article.findUnique.mockResolvedValue({ id: 'a1' });
+    prisma.user.findUnique.mockResolvedValue(null);
+    await expect(
+      service.create({ content: 'Nice', articleId: 'a1', authorId: 'u-missing' }),
+    ).rejects.toThrow(UnprocessableEntityException);
+  });
+
+  it('throws not found for missing comment', async () => {
+    prisma.comment.findUnique.mockResolvedValue(null);
+    await expect(service.findOne('missing')).rejects.toThrow(NotFoundException);
+  });
+
+  it('filters by articleId', async () => {
+    prisma.comment.findMany.mockResolvedValue([]);
+    await service.findAll({ articleId: 'a1' });
+    expect(prisma.comment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { articleId: 'a1' } }),
+    );
   });
 });
