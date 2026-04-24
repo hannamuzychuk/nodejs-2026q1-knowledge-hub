@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "engines": {
-    "node": "24.10.0"
+    "node": ">=24.10.0"
   },
   "scripts": {
     "prebuild": "rimraf dist",
@@ -18,11 +18,14 @@
     "start:prod": "node dist/src/main.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest --testMatch \"<rootDir>/*.spec.ts\" --noStackTrace --runInBand",
+    "test:unit": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:all": "vitest run && jest --testMatch \"<rootDir>/*.spec.ts\" --noStackTrace --runInBand",
     "test:auth": "cross-env TEST_MODE=auth JWT_SECRET=test_jwt_access_secret JWT_SECRET_REFRESH_KEY=test_refresh_secret jest --testPathIgnorePatterns \"refresh|rbac\" --noStackTrace --runInBand",
     "test:refresh": "cross-env TEST_MODE=auth JWT_SECRET=test_jwt_access_secret JWT_SECRET_REFRESH_KEY=test_refresh_secret jest --testPathPattern refresh.e2e.spec.ts --noStackTrace --runInBand",
     "test:rbac": "cross-env TEST_MODE=auth JWT_SECRET=test_jwt_access_secret JWT_SECRET_REFRESH_KEY=test_refresh_secret jest --testPathPattern rbac --noStackTrace --runInBand",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
+    "test:watch": "vitest",
+    "test:cov": "vitest run --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand"
   },
   "dependencies": {
@@ -70,7 +73,9 @@
     "ts-loader": "^9.5.1",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.5.4"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "@vitest/coverage-v8": "^3.2.4"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
