@@ -42,6 +42,22 @@ describe('CategoryService', () => {
     });
   });
 
+  it('finds all categories with article counters', async () => {
+    prisma.category.findMany.mockResolvedValue([]);
+
+    await service.findAll();
+
+    expect(prisma.category.findMany).toHaveBeenCalledWith({
+      include: {
+        _count: {
+          select: {
+            articles: true,
+          },
+        },
+      },
+    });
+  });
+
   it('throws not found for missing category', async () => {
     prisma.category.findUnique.mockResolvedValue(null);
     await expect(service.findOne('missing')).rejects.toThrow(NotFoundException);

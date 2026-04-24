@@ -71,6 +71,39 @@ describe('ArticleService', () => {
     );
   });
 
+  it('builds filtering query with undefined status when status is omitted', async () => {
+    prisma.article.findMany.mockResolvedValue([]);
+
+    await service.findAll({ categoryId: 'cat-1' });
+
+    expect(prisma.article.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: undefined,
+          categoryId: 'cat-1',
+        }),
+      }),
+    );
+  });
+
+  it('creates article with undefined category relation when categoryId is absent', async () => {
+    prisma.article.create.mockResolvedValue({ id: 'a1' });
+
+    await service.create({
+      title: 'Without category',
+      content: 'Body',
+      tags: [],
+    });
+
+    expect(prisma.article.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          category: undefined,
+        }),
+      }),
+    );
+  });
+
   it('throws not found when article does not exist', async () => {
     prisma.article.findUnique.mockResolvedValue(null);
     await expect(service.findOne('missing')).rejects.toThrow(NotFoundException);
