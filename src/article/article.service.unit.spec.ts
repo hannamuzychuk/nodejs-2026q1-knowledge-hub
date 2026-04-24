@@ -1,100 +1,124 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
+import { vi } from 'vitest';
 import { ArticleService } from './article.service';
-import { DbService } from 'src/db/db.service';
-import { ArticleStatus } from './entities/article.entity';
+import { PrismaService } from '../prisma/prisma.service';
 
 describe('ArticleService', () => {
   let service: ArticleService;
-  let db: DbService;
+  const prisma = {
+    article: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+  };
 
   beforeEach(async () => {
+    vi.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
-      providers: [ArticleService, DbService],
+      providers: [
+        {
+          provide: ArticleService,
+          useFactory: () => new ArticleService(prisma as any),
+        },
+        { provide: PrismaService, useValue: prisma },
+      ],
     }).compile();
 
     service = module.get(ArticleService);
-    db = module.get(DbService);
   });
 
-  it('creates article with defaults', () => {
-    const created = service.create({
+  it('creates article with default draft status and tags mapping', async () => {
+    prisma.article.create.mockResolvedValue({ id: 'a1', status: 'DRAFT', tags: [] });
+
+    await service.create({
       title: 'Nest Intro',
       content: 'Body',
+      tags: ['node', 'nest'],
     });
 
-    expect(created.status).toBe(ArticleStatus.DRAFT);
-    expect(created.tags).toEqual([]);
-    expect(db.articles).toHaveLength(1);
-  });
-
-  it('filters articles by status, category and tag', () => {
-    db.articles.push(
-      {
-        id: 'a1',
-        title: 'one',
-        content: 'one',
-        status: ArticleStatus.DRAFT,
-        authorId: null,
-        categoryId: 'cat-1',
-        tags: ['node'],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      },
-      {
-        id: 'a2',
-        title: 'two',
-        content: 'two',
-        status: ArticleStatus.PUBLISHED,
-        authorId: null,
-        categoryId: 'cat-2',
-        tags: ['nestjs'],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      },
+    expect(prisma.article.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'DRAFT',
+          tags: {
+            connectOrCreate: [
+              { where: { name: 'node' }, create: { name: 'node' } },
+              { where: { name: 'nest' }, create: { name: 'nest' } },
+            ],
+          },
+        }),
+      }),
     );
-
-    expect(service.findAll({ status: ArticleStatus.PUBLISHED })).toHaveLength(1);
-    expect(service.findAll({ categoryId: 'cat-1' })).toHaveLength(1);
-    expect(service.findAll({ tag: 'nestjs' })).toHaveLength(1);
   });
 
-  it('throws not found when article does not exist', () => {
-    expect(() => service.findOne('missing')).toThrow(NotFoundException);
+  it('builds filtering query by status, categoryId and tag', async () => {
+    prisma.article.findMany.mockResolvedValue([]);
+
+    await service.findAll({ status: 'PUBLISHED' as any, categoryId: 'cat-1', tag: 'nestjs' });
+
+    expect(prisma.article.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          status: 'PUBLISHED',
+          categoryId: 'cat-1',
+          tags: { some: { name: 'nestjs' } },
+        },
+      }),
+    );
   });
 
-  it('updates existing article', () => {
-    const created = service.create({
-      title: 'Nest Intro',
-      content: 'Body',
-      tags: ['backend'],
-    });
-
-    const updated = service.update(created.id, {
-      status: ArticleStatus.PUBLISHED,
-      tags: ['backend', 'api'],
-    });
-
-    expect(updated.status).toBe(ArticleStatus.PUBLISHED);
-    expect(updated.tags).toEqual(['backend', 'api']);
+  it('throws not found when article does not exist', async () => {
+    prisma.article.findUnique.mockResolvedValue(null);
+    await expect(service.findOne('missing')).rejects.toThrow(NotFoundException);
   });
 
-  it('removes article and linked comments', () => {
-    const created = service.create({
-      title: 'Nest Intro',
-      content: 'Body',
-    });
-    db.comments.push({
-      id: 'c1',
-      content: 'Comment',
-      articleId: created.id,
-      authorId: null,
-      createdAt: Date.now(),
+  it('updates article status transition draft to published', async () => {
+    prisma.article.findUnique.mockResolvedValue({ id: 'a1' });
+    prisma.article.update.mockResolvedValue({ id: 'a1', status: 'PUBLISHED' });
+
+    const updated = await service.update('a1', {
+      status: 'PUBLISHED' as any,
     });
 
-    service.remove(created.id);
+    expect(updated.status).toBe('PUBLISHED');
+    expect(prisma.article.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'a1' },
+        data: expect.objectContaining({ status: 'PUBLISHED' }),
+      }),
+    );
+  });
 
-    expect(db.articles).toHaveLength(0);
-    expect(db.comments).toHaveLength(0);
+  it('updates tags using reset and connectOrCreate', async () => {
+    prisma.article.findUnique.mockResolvedValue({ id: 'a1' });
+    prisma.article.update.mockResolvedValue({ id: 'a1' });
+
+    await service.update('a1', { tags: ['api', 'backend'] });
+
+    expect(prisma.article.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tags: {
+            set: [],
+            connectOrCreate: [
+              { where: { name: 'api' }, create: { name: 'api' } },
+              { where: { name: 'backend' }, create: { name: 'backend' } },
+            ],
+          },
+        }),
+      }),
+    );
+  });
+
+  it('removes existing article', async () => {
+    prisma.article.findUnique.mockResolvedValue({ id: 'a1' });
+    prisma.article.delete.mockResolvedValue({ id: 'a1' });
+
+    await service.remove('a1');
+    expect(prisma.article.delete).toHaveBeenCalledWith({ where: { id: 'a1' } });
   });
 });
