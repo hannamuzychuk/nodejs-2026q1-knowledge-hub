@@ -10,8 +10,15 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['src/app.service.ts', 'src/db/db.service.ts'],
-      exclude: ['src/main.ts'],
+      include: [
+        'src/app.service.ts',
+        'src/db/db.service.ts',
+        'src/article/article.service.ts',
+        'src/category/category.service.ts',
+        'src/auth/guards/jwt-auth.guard.ts',
+        'src/auth/guards/roles.guard.ts',
+      ],
+      exclude: ['src/main.ts', 'src/**/*.module.ts', 'src/**/*.controller.ts'],
       thresholds: {
         lines: 90,
         branches: 85,
