@@ -1,11 +1,8 @@
-import {
-  Injectable,
-  NotFoundException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotFoundError } from '../common/errors/app-error';
 
 @Injectable()
 export class CommentService {
@@ -63,7 +60,7 @@ export class CommentService {
     });
 
     if (!comment) {
-      throw new NotFoundException(`Comment with ID ${id} not found`);
+      throw new NotFoundError(`Comment with ID ${id} not found`);
     }
     return comment;
   }

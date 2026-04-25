@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UserService } from '../user/user.service';
@@ -11,6 +6,11 @@ import { AuthCredentialsDto } from './dto/auth-credentials.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { getJwtAccessSecret, getJwtRefreshSecret } from './jwt-secrets.util';
 import { AuthUser } from './types/auth-user.type';
+import {
+  ForbiddenError,
+  UnauthorizedError,
+  ValidationError,
+} from '../common/errors/app-error';
 
 type TokenPayload = AuthUser;
 
@@ -49,7 +49,7 @@ export class AuthService {
     }
 
     if (existingUser) {
-      throw new BadRequestException('Login is already taken');
+      throw new ValidationError('Login is already taken');
     }
 
     return this.userService.create({
@@ -62,12 +62,12 @@ export class AuthService {
   async login(dto: AuthCredentialsDto) {
     const user = await this.userService.findByLogin(dto.login);
     if (!user) {
-      throw new ForbiddenException('Invalid login or password');
+      throw new ForbiddenError('Invalid login or password');
     }
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.password);
     if (!isPasswordValid) {
-      throw new ForbiddenException('Invalid login or password');
+      throw new ForbiddenError('Invalid login or password');
     }
 
     return this.generateTokenPair({
@@ -81,7 +81,7 @@ export class AuthService {
 
   async refresh(dto: RefreshTokenDto) {
     if (!dto?.refreshToken || typeof dto.refreshToken !== 'string') {
-      throw new UnauthorizedException('Refresh token is required');
+      throw new UnauthorizedError('Refresh token is required');
     }
 
     let payload: TokenPayload;
@@ -93,12 +93,12 @@ export class AuthService {
         },
       );
     } catch {
-      throw new ForbiddenException('Refresh token is invalid or expired');
+      throw new ForbiddenError('Refresh token is invalid or expired');
     }
 
     const user = await this.userService.findById(payload.userId);
     if (!user) {
-      throw new ForbiddenException('Refresh token is invalid');
+      throw new ForbiddenError('Refresh token is invalid');
     }
 
     const shouldSkipRevokedCheckForTestUser = this.isAuthE2eTestLogin(
@@ -108,7 +108,7 @@ export class AuthService {
       !shouldSkipRevokedCheckForTestUser &&
       this.revokedRefreshTokens.has(dto.refreshToken)
     ) {
-      throw new ForbiddenException('Refresh token is invalid or expired');
+      throw new ForbiddenError('Refresh token is invalid or expired');
     }
 
     return this.generateTokenPair({
@@ -120,7 +120,7 @@ export class AuthService {
 
   async logout(dto: RefreshTokenDto) {
     if (!dto?.refreshToken || typeof dto.refreshToken !== 'string') {
-      throw new UnauthorizedException('Refresh token is required');
+      throw new UnauthorizedError('Refresh token is required');
     }
 
     try {
@@ -128,7 +128,7 @@ export class AuthService {
         secret: getJwtRefreshSecret(),
       });
     } catch {
-      throw new UnauthorizedException('Refresh token is invalid or expired');
+      throw new UnauthorizedError('Refresh token is invalid or expired');
     }
 
     this.revokedRefreshTokens.add(dto.refreshToken);

@@ -1,9 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { compare, hash } from 'bcrypt';
 import { vi } from 'vitest';
 import { UserService } from './user.service';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from '../common/errors/app-error';
 
 vi.mock('bcrypt', () => ({
   compare: vi.fn(),
@@ -52,7 +56,10 @@ describe('UserService', () => {
     });
     vi.mocked(hash).mockResolvedValue('hashed-pass' as never);
 
-    const created = await service.create({ login: 'john', password: 'secret123' });
+    const created = await service.create({
+      login: 'john',
+      password: 'secret123',
+    });
 
     expect(prisma.user.create).toHaveBeenCalledWith({
       data: { login: 'john', password: 'hashed-pass', role: 'VIEWER' },
@@ -63,14 +70,14 @@ describe('UserService', () => {
   it('throws bad request when login already exists', async () => {
     prisma.user.findFirst.mockResolvedValue({ id: 'u1', login: 'john' });
 
-    await expect(service.create({ login: 'john', password: 'secret123' })).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(
+      service.create({ login: 'john', password: 'secret123' }),
+    ).rejects.toThrow(ValidationError);
   });
 
   it('throws not found on findOne for missing user', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
-    await expect(service.findOne('missing')).rejects.toThrow(NotFoundException);
+    await expect(service.findOne('missing')).rejects.toThrow(NotFoundError);
   });
 
   it('throws forbidden on update when old password does not match', async () => {
@@ -84,13 +91,13 @@ describe('UserService', () => {
 
     await expect(
       service.update('u1', { oldPassword: 'wrong', newPassword: 'new-secret' }),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('throws bad request on update when only one password field is provided', async () => {
-    await expect(service.update('u1', { oldPassword: 'old-only' })).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(
+      service.update('u1', { oldPassword: 'old-only' }),
+    ).rejects.toThrow(ValidationError);
   });
 
   it('archives user articles then deletes user on remove', async () => {

@@ -1,16 +1,14 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../prisma/prisma.service';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { getJwtAccessSecret } from '../jwt-secrets.util';
 import { AuthUser } from '../types/auth-user.type';
+import {
+  ForbiddenError,
+  UnauthorizedError,
+} from '../../common/errors/app-error';
 
 @Injectable()
 export class JwtRbacGuard implements CanActivate {
@@ -38,12 +36,12 @@ export class JwtRbacGuard implements CanActivate {
     const authHeader = request.headers.authorization;
 
     if (!authHeader || typeof authHeader !== 'string') {
-      throw new UnauthorizedException('Authorization header is required');
+      throw new UnauthorizedError('Authorization header is required');
     }
 
     const [scheme, token] = authHeader.split(' ');
     if (scheme !== 'Bearer' || !token) {
-      throw new UnauthorizedException('Invalid authorization header format');
+      throw new UnauthorizedError('Invalid authorization header format');
     }
 
     let payload: AuthUser;
@@ -52,7 +50,7 @@ export class JwtRbacGuard implements CanActivate {
         secret: getJwtAccessSecret(),
       });
     } catch {
-      throw new UnauthorizedException('Access token is invalid or expired');
+      throw new UnauthorizedError('Access token is invalid or expired');
     }
 
     request.user = payload;
@@ -83,23 +81,23 @@ export class JwtRbacGuard implements CanActivate {
     }
 
     if (role === 'viewer') {
-      throw new ForbiddenException('Insufficient permissions');
+      throw new ForbiddenError('Insufficient permissions');
     }
 
     if (role !== 'editor') {
-      throw new ForbiddenException('Insufficient permissions');
+      throw new ForbiddenError('Insufficient permissions');
     }
 
     if (basePath === '/category') {
-      throw new ForbiddenException('Insufficient permissions');
+      throw new ForbiddenError('Insufficient permissions');
     }
 
     if (basePath === '/user') {
       if (method !== 'PUT' || !resourceId || resourceId !== user.userId) {
-        throw new ForbiddenException('Insufficient permissions');
+        throw new ForbiddenError('Insufficient permissions');
       }
       if (request.body?.role !== undefined) {
-        throw new ForbiddenException('Only admins can change user role');
+        throw new ForbiddenError('Only admins can change user role');
       }
       return true;
     }
@@ -122,7 +120,7 @@ export class JwtRbacGuard implements CanActivate {
       );
     }
 
-    throw new ForbiddenException('Insufficient permissions');
+    throw new ForbiddenError('Insufficient permissions');
   }
 
   private async allowEditorArticleAction(
@@ -138,16 +136,14 @@ export class JwtRbacGuard implements CanActivate {
         requestBody.authorId = user.userId;
       }
       if (requestBody.authorId !== user.userId) {
-        throw new ForbiddenException(
-          'Editors can only create their own articles',
-        );
+        throw new ForbiddenError('Editors can only create their own articles');
       }
       return true;
     }
 
     if (method === 'PUT') {
       if (!articleId) {
-        throw new ForbiddenException('Insufficient permissions');
+        throw new ForbiddenError('Insufficient permissions');
       }
 
       const article = await this.prisma.article.findUnique({
@@ -160,13 +156,11 @@ export class JwtRbacGuard implements CanActivate {
       }
 
       if (article.authorId !== user.userId) {
-        throw new ForbiddenException(
-          'Editors can only update their own articles',
-        );
+        throw new ForbiddenError('Editors can only update their own articles');
       }
 
       if (requestBody.authorId && requestBody.authorId !== user.userId) {
-        throw new ForbiddenException('Editors cannot reassign article owner');
+        throw new ForbiddenError('Editors cannot reassign article owner');
       }
 
       return true;
@@ -174,7 +168,7 @@ export class JwtRbacGuard implements CanActivate {
 
     if (method === 'DELETE') {
       if (!articleId) {
-        throw new ForbiddenException('Insufficient permissions');
+        throw new ForbiddenError('Insufficient permissions');
       }
 
       const article = await this.prisma.article.findUnique({
@@ -187,15 +181,13 @@ export class JwtRbacGuard implements CanActivate {
       }
 
       if (article.authorId !== user.userId) {
-        throw new ForbiddenException(
-          'Editors cannot delete other users articles',
-        );
+        throw new ForbiddenError('Editors cannot delete other users articles');
       }
 
       return true;
     }
 
-    throw new ForbiddenException('Insufficient permissions');
+    throw new ForbiddenError('Insufficient permissions');
   }
 
   private async allowEditorCommentAction(
@@ -211,16 +203,14 @@ export class JwtRbacGuard implements CanActivate {
         requestBody.authorId = user.userId;
       }
       if (requestBody.authorId !== user.userId) {
-        throw new ForbiddenException(
-          'Editors can only create their own comments',
-        );
+        throw new ForbiddenError('Editors can only create their own comments');
       }
       return true;
     }
 
     if (method === 'PUT' || method === 'DELETE') {
       if (!commentId) {
-        throw new ForbiddenException('Insufficient permissions');
+        throw new ForbiddenError('Insufficient permissions');
       }
 
       const comment = await this.prisma.comment.findUnique({
@@ -233,7 +223,7 @@ export class JwtRbacGuard implements CanActivate {
       }
 
       if (comment.authorId !== user.userId) {
-        throw new ForbiddenException(
+        throw new ForbiddenError(
           method === 'PUT'
             ? 'Editors can only update their own comments'
             : 'Editors cannot delete other users comments',
@@ -245,13 +235,13 @@ export class JwtRbacGuard implements CanActivate {
         requestBody.authorId &&
         requestBody.authorId !== user.userId
       ) {
-        throw new ForbiddenException('Editors cannot reassign comment owner');
+        throw new ForbiddenError('Editors cannot reassign comment owner');
       }
 
       return true;
     }
 
-    throw new ForbiddenException('Insufficient permissions');
+    throw new ForbiddenError('Insufficient permissions');
   }
 
   private getBasePath(path: string): string {

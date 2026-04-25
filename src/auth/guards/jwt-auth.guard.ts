@@ -1,12 +1,8 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { getJwtAccessSecret } from '../jwt-secrets.util';
 import { AuthUser } from '../types/auth-user.type';
+import { UnauthorizedError } from '../../common/errors/app-error';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -17,12 +13,12 @@ export class JwtAuthGuard implements CanActivate {
     const authHeader = request?.headers?.authorization;
 
     if (!authHeader || typeof authHeader !== 'string') {
-      throw new UnauthorizedException('Authorization header is required');
+      throw new UnauthorizedError('Authorization header is required');
     }
 
     const [scheme, token] = authHeader.split(' ');
     if (scheme !== 'Bearer' || !token) {
-      throw new UnauthorizedException('Invalid authorization header format');
+      throw new UnauthorizedError('Invalid authorization header format');
     }
 
     try {
@@ -32,7 +28,7 @@ export class JwtAuthGuard implements CanActivate {
       request.user = payload;
       return true;
     } catch {
-      throw new UnauthorizedException('Access token is invalid or expired');
+      throw new UnauthorizedError('Access token is invalid or expired');
     }
   }
 }
