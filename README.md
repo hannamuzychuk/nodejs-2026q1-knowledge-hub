@@ -154,6 +154,115 @@ npm run build
 npm run test
 ```
 
+## Assignment 8A - Testing (Vitest)
+
+Unit testing scope for this task is implemented with `Vitest` and `@nestjs/testing`.
+
+Implemented coverage:
+
+- Service unit tests (isolated with mocks):
+  - `UserService`
+  - `ArticleService`
+  - `CategoryService`
+  - `CommentService`
+  - `AuthService`
+- Guard unit tests:
+  - `JwtAuthGuard`
+  - `JwtRbacGuard`
+  - `RolesGuard`
+- Exception filter unit tests:
+  - `HttpExceptionFilter`
+- Pipe unit tests:
+  - UUID parsing / invalid UUID handling
+- DTO validation unit tests:
+  - required fields
+  - invalid enums/types
+  - valid payloads
+
+Testing principles used:
+
+- Dependency isolation via mocks (`vi.fn`, `vi.mock`, `vi.spyOn`)
+- No real DB calls in unit tests
+- No real HTTP calls in unit tests
+- Edge cases covered (invalid UUIDs, duplicate login, expired/invalid token, forbidden actions, not found resources)
+
+Scripts:
+
+```bash
+npm run test
+npm run test:unit
+npm run test:coverage
+```
+
+Coverage thresholds are configured in `vitest.config.ts`:
+
+- Lines: `>= 90%`
+- Branches: `>= 85%`
+
+## Assignment 8B - Logging & Error Handling
+
+Production-ready logging and error handling are implemented in the Nest bootstrap and common layer.
+
+Implemented:
+
+- Nest-compatible custom logger with configurable level:
+  - `LOG_LEVEL` (default `log`)
+  - supported levels: `log`, `debug`, `warn`, `error`, `verbose`
+- Environment-aware output format:
+  - development: human-readable logs
+  - production: JSON structured logs
+- Request/response logging middleware:
+  - request: `method`, `url`, `query`, `body`
+  - response: `statusCode`, `responseTimeMs`
+- Sensitive data redaction:
+  - `password`, `token`, `authorization`, `oldPassword`, `newPassword` are logged as `[REDACTED]`
+- Global exception handling filter:
+  - logs errors with stack traces
+  - maps known errors to proper HTTP status
+  - fallback unknown error response:
+    - `statusCode: 500`
+    - `error: Internal Server Error`
+    - `message: An unexpected error occurred`
+- Custom error classes:
+  - `NotFoundError` -> `404`
+  - `ValidationError` -> `400`
+  - `UnauthorizedError` -> `401`
+  - `ForbiddenError` -> `403`
+- Process-level handlers:
+  - `uncaughtException` with graceful shutdown
+  - `unhandledRejection` with graceful shutdown
+- File logging with size-based rotation:
+  - `LOG_MAX_FILE_SIZE` in KB (default `1024`)
+  - `logs/app.log` rotates to `logs/app-<timestamp>.log`
+
+Environment variables added:
+
+```env
+LOG_LEVEL=log
+LOG_MAX_FILE_SIZE=1024
+```
+
+Quick verification examples:
+
+```bash
+# typecheck + lint + unit
+npx tsc --noEmit
+npm run lint
+npm run test:unit
+
+# e2e (API should be running on the same PORT)
+PORT=4000 npm run test
+
+# production structured logs
+PORT=4011 NODE_ENV=production npm start
+
+# error-only logs
+PORT=4012 LOG_LEVEL=error npm start
+
+# force frequent rotation
+PORT=4010 LOG_MAX_FILE_SIZE=1 npm start
+```
+
 ## Prisma Commands
 
 ```bash
