@@ -1,10 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { compare } from 'bcrypt';
 import { vi } from 'vitest';
 import { AuthService } from './auth.service';
 import { UserService } from '../user/user.service';
+import {
+  ForbiddenError,
+  UnauthorizedError,
+  ValidationError,
+} from '../common/errors/app-error';
 
 vi.mock('bcrypt', () => ({
   compare: vi.fn(),
@@ -31,7 +35,8 @@ describe('AuthService', () => {
       providers: [
         {
           provide: AuthService,
-          useFactory: () => new AuthService(userService as any, jwtService as any),
+          useFactory: () =>
+            new AuthService(userService as any, jwtService as any),
         },
         { provide: UserService, useValue: userService },
         { provide: JwtService, useValue: jwtService },
@@ -53,9 +58,9 @@ describe('AuthService', () => {
 
   it('throws for duplicate login on signup', async () => {
     userService.findByLogin.mockResolvedValue({ id: 'u1', login: 'john' });
-    await expect(service.signup({ login: 'john', password: 'x' })).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(
+      service.signup({ login: 'john', password: 'x' }),
+    ).rejects.toThrow(ValidationError);
   });
 
   it('generates access and refresh token on valid login', async () => {
@@ -66,9 +71,14 @@ describe('AuthService', () => {
       password: 'hashed',
     });
     vi.mocked(compare).mockResolvedValue(true as never);
-    jwtService.signAsync.mockResolvedValueOnce('access').mockResolvedValueOnce('refresh');
+    jwtService.signAsync
+      .mockResolvedValueOnce('access')
+      .mockResolvedValueOnce('refresh');
 
-    const result = await service.login({ login: 'john', password: 'secret123' });
+    const result = await service.login({
+      login: 'john',
+      password: 'secret123',
+    });
 
     expect(result).toEqual({ accessToken: 'access', refreshToken: 'refresh' });
     expect(jwtService.signAsync).toHaveBeenCalledTimes(2);
@@ -83,9 +93,9 @@ describe('AuthService', () => {
     });
     vi.mocked(compare).mockResolvedValue(false as never);
 
-    await expect(service.login({ login: 'john', password: 'bad' })).rejects.toThrow(
-      ForbiddenException,
-    );
+    await expect(
+      service.login({ login: 'john', password: 'bad' }),
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('rotates refresh token when refresh token is valid', async () => {
@@ -99,23 +109,28 @@ describe('AuthService', () => {
       login: 'john',
       role: 'EDITOR',
     });
-    jwtService.signAsync.mockResolvedValueOnce('new-access').mockResolvedValueOnce('new-refresh');
+    jwtService.signAsync
+      .mockResolvedValueOnce('new-access')
+      .mockResolvedValueOnce('new-refresh');
 
     const tokens = await service.refresh({ refreshToken: 'old-refresh' });
 
-    expect(tokens).toEqual({ accessToken: 'new-access', refreshToken: 'new-refresh' });
+    expect(tokens).toEqual({
+      accessToken: 'new-access',
+      refreshToken: 'new-refresh',
+    });
   });
 
   it('throws for expired or invalid refresh token', async () => {
     jwtService.verifyAsync.mockRejectedValue(new Error('jwt expired'));
-    await expect(service.refresh({ refreshToken: 'bad-token' })).rejects.toThrow(
-      ForbiddenException,
-    );
+    await expect(
+      service.refresh({ refreshToken: 'bad-token' }),
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('throws unauthorized when refresh token is missing', async () => {
     await expect(service.refresh({ refreshToken: '' })).rejects.toThrow(
-      UnauthorizedException,
+      UnauthorizedError,
     );
   });
 });

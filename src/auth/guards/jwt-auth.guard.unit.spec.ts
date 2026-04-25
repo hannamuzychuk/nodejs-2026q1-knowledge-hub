@@ -1,7 +1,8 @@
-import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { ExecutionContext } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { vi } from 'vitest';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { UnauthorizedError } from '../../common/errors/app-error';
 
 describe('JwtAuthGuard', () => {
   const jwtService = { verifyAsync: vi.fn() } as unknown as JwtService;
@@ -28,15 +29,15 @@ describe('JwtAuthGuard', () => {
   });
 
   it('throws unauthorized when authorization header is missing', async () => {
-    await expect(guard.canActivate(createContext({ headers: {} }))).rejects.toThrow(
-      UnauthorizedException,
-    );
+    await expect(
+      guard.canActivate(createContext({ headers: {} })),
+    ).rejects.toThrow(UnauthorizedError);
   });
 
   it('throws unauthorized for malformed authorization header', async () => {
     const request = { headers: { authorization: 'Token nope' } };
     await expect(guard.canActivate(createContext(request))).rejects.toThrow(
-      UnauthorizedException,
+      UnauthorizedError,
     );
   });
 
@@ -44,7 +45,7 @@ describe('JwtAuthGuard', () => {
     (jwtService.verifyAsync as any).mockRejectedValue(new Error('expired'));
     const request = { headers: { authorization: 'Bearer bad' } };
     await expect(guard.canActivate(createContext(request))).rejects.toThrow(
-      UnauthorizedException,
+      UnauthorizedError,
     );
   });
 });

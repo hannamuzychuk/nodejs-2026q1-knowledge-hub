@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
 import { vi } from 'vitest';
 import { ArticleService } from './article.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotFoundError } from '../common/errors/app-error';
 
 describe('ArticleService', () => {
   let service: ArticleService;
@@ -32,7 +32,11 @@ describe('ArticleService', () => {
   });
 
   it('creates article with default draft status and tags mapping', async () => {
-    prisma.article.create.mockResolvedValue({ id: 'a1', status: 'DRAFT', tags: [] });
+    prisma.article.create.mockResolvedValue({
+      id: 'a1',
+      status: 'DRAFT',
+      tags: [],
+    });
 
     await service.create({
       title: 'Nest Intro',
@@ -58,7 +62,11 @@ describe('ArticleService', () => {
   it('builds filtering query by status, categoryId and tag', async () => {
     prisma.article.findMany.mockResolvedValue([]);
 
-    await service.findAll({ status: 'PUBLISHED' as any, categoryId: 'cat-1', tag: 'nestjs' });
+    await service.findAll({
+      status: 'PUBLISHED' as any,
+      categoryId: 'cat-1',
+      tag: 'nestjs',
+    });
 
     expect(prisma.article.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -106,7 +114,7 @@ describe('ArticleService', () => {
 
   it('throws not found when article does not exist', async () => {
     prisma.article.findUnique.mockResolvedValue(null);
-    await expect(service.findOne('missing')).rejects.toThrow(NotFoundException);
+    await expect(service.findOne('missing')).rejects.toThrow(NotFoundError);
   });
 
   it('updates article status transition draft to published', async () => {

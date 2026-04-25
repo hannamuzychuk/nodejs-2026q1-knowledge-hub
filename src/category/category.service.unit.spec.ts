@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
 import { vi } from 'vitest';
 import { CategoryService } from './category.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotFoundError } from '../common/errors/app-error';
 
 describe('CategoryService', () => {
   let service: CategoryService;
@@ -60,12 +60,15 @@ describe('CategoryService', () => {
 
   it('throws not found for missing category', async () => {
     prisma.category.findUnique.mockResolvedValue(null);
-    await expect(service.findOne('missing')).rejects.toThrow(NotFoundException);
+    await expect(service.findOne('missing')).rejects.toThrow(NotFoundError);
   });
 
   it('updates category fields', async () => {
     prisma.category.findUnique.mockResolvedValue({ id: 'cat1' });
-    prisma.category.update.mockResolvedValue({ id: 'cat1', description: 'new-desc' });
+    prisma.category.update.mockResolvedValue({
+      id: 'cat1',
+      description: 'new-desc',
+    });
     const updated = await service.update('cat1', { description: 'new-desc' });
 
     expect(updated.description).toBe('new-desc');
@@ -81,6 +84,8 @@ describe('CategoryService', () => {
       where: { categoryId: 'cat1' },
       data: { categoryId: null },
     });
-    expect(prisma.category.delete).toHaveBeenCalledWith({ where: { id: 'cat1' } });
+    expect(prisma.category.delete).toHaveBeenCalledWith({
+      where: { id: 'cat1' },
+    });
   });
 });

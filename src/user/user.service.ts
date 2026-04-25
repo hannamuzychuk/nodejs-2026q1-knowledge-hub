@@ -1,13 +1,13 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from '../common/errors/app-error';
 
 @Injectable()
 export class UserService {
@@ -16,7 +16,7 @@ export class UserService {
   async create(dto: CreateUserDto) {
     const existingUser = await this.findByLogin(dto.login);
     if (existingUser) {
-      throw new BadRequestException('Login is already taken');
+      throw new ValidationError('Login is already taken');
     }
 
     const hashedPassword = await this.hashPassword(dto.password);
@@ -47,7 +47,7 @@ export class UserService {
     const user = await this.findById(id);
 
     if (!user) {
-      throw new NotFoundException(`User with ID ${id} not found`);
+      throw new NotFoundError(`User with ID ${id} not found`);
     }
 
     return this.removePassword(user);
@@ -55,17 +55,17 @@ export class UserService {
 
   async update(id: string, dto: UpdateUserDto) {
     if (!dto.oldPassword && !dto.newPassword && !dto.role) {
-      throw new BadRequestException('No valid fields to update');
+      throw new ValidationError('No valid fields to update');
     }
 
     const user = await this.findById(id);
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new NotFoundError('User not found');
 
     const data: { password?: string; role?: UpdateUserDto['role'] } = {};
 
     if (dto.oldPassword || dto.newPassword) {
       if (!dto.oldPassword || !dto.newPassword) {
-        throw new BadRequestException(
+        throw new ValidationError(
           'Both oldPassword and newPassword are required',
         );
       }
@@ -74,7 +74,7 @@ export class UserService {
         user.password,
       );
       if (!passwordMatches) {
-        throw new ForbiddenException('Old password is wrong');
+        throw new ForbiddenError('Old password is wrong');
       }
       data.password = await this.hashPassword(dto.newPassword);
     }
@@ -93,7 +93,7 @@ export class UserService {
 
   async remove(id: string) {
     const user = await this.findById(id);
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new NotFoundError('User not found');
 
     await this.prisma.$transaction(async (tx) => {
       await tx.article.updateMany({
