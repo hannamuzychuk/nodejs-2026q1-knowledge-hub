@@ -25,6 +25,7 @@ describe('JwtRbacGuard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.JWT_SECRET = 'test-access-secret';
+    process.env.TEST_MODE = 'auth';
     guard = new JwtRbacGuard(reflector, jwtService, prisma);
   });
 
