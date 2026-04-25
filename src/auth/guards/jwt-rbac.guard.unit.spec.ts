@@ -1,9 +1,13 @@
-import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { vi } from 'vitest';
 import { JwtRbacGuard } from './jwt-rbac.guard';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  ForbiddenError,
+  UnauthorizedError,
+} from '../../common/errors/app-error';
 
 describe('JwtRbacGuard', () => {
   const reflector = { getAllAndOverride: vi.fn() } as unknown as Reflector;
@@ -50,8 +54,10 @@ describe('JwtRbacGuard', () => {
   it('throws unauthorized when authorization header is missing', async () => {
     reflector.getAllAndOverride = vi.fn().mockReturnValue(false);
     await expect(
-      guard.canActivate(createContext({ headers: {}, method: 'GET', path: '/article' })),
-    ).rejects.toThrow(UnauthorizedException);
+      guard.canActivate(
+        createContext({ headers: {}, method: 'GET', path: '/article' }),
+      ),
+    ).rejects.toThrow(UnauthorizedError);
   });
 
   it('throws unauthorized on malformed authorization header', async () => {
@@ -64,7 +70,7 @@ describe('JwtRbacGuard', () => {
           path: '/article',
         }),
       ),
-    ).rejects.toThrow(UnauthorizedException);
+    ).rejects.toThrow(UnauthorizedError);
   });
 
   it('throws unauthorized for expired token', async () => {
@@ -78,7 +84,7 @@ describe('JwtRbacGuard', () => {
           path: '/article',
         }),
       ),
-    ).rejects.toThrow(UnauthorizedException);
+    ).rejects.toThrow(UnauthorizedError);
   });
 
   it('throws forbidden when viewer attempts non-GET operation', async () => {
@@ -98,7 +104,7 @@ describe('JwtRbacGuard', () => {
           body: {},
         }),
       ),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('allows editor to update own article and blocks other owner', async () => {
@@ -108,7 +114,9 @@ describe('JwtRbacGuard', () => {
       login: 'ed',
       role: 'editor',
     });
-    (prisma.article.findUnique as any).mockResolvedValueOnce({ authorId: 'editor-1' });
+    (prisma.article.findUnique as any).mockResolvedValueOnce({
+      authorId: 'editor-1',
+    });
 
     await expect(
       guard.canActivate(
@@ -122,7 +130,9 @@ describe('JwtRbacGuard', () => {
       ),
     ).resolves.toBe(true);
 
-    (prisma.article.findUnique as any).mockResolvedValueOnce({ authorId: 'another-user' });
+    (prisma.article.findUnique as any).mockResolvedValueOnce({
+      authorId: 'another-user',
+    });
     await expect(
       guard.canActivate(
         createContext({
@@ -133,6 +143,6 @@ describe('JwtRbacGuard', () => {
           body: {},
         }),
       ),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenError);
   });
 });

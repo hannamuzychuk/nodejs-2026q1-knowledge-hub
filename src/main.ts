@@ -8,7 +8,11 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { NextFunction, Request, Response } from 'express';
+import * as express from 'express';
 import { assertJwtEnvConfigured } from './auth/jwt-secrets.util';
+import { AppLogger } from './common/logging/app-logger.service';
+import { createRequestLoggingMiddleware } from './common/logging/request-logging.middleware';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 dotenv.config();
 
@@ -52,7 +56,13 @@ const buildIpRateLimiter = (config: RateLimitConfig) => {
 async function bootstrap() {
   assertJwtEnvConfigured();
 
-  const app = await NestFactory.create(AppModule);
+  const logger = new AppLogger(process.env.NODE_ENV === 'production');
+  const app = await NestFactory.create(AppModule, { logger: false });
+  app.useLogger(logger);
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+  app.use(createRequestLoggingMiddleware(logger));
+  app.useGlobalFilters(new HttpExceptionFilter(logger));
 
   const isProduction = process.env.NODE_ENV === 'production';
 
@@ -116,8 +126,43 @@ async function bootstrap() {
   SwaggerModule.setup('doc', app, document);
 
   const port = process.env.PORT || 4000;
+  let isShuttingDown = false;
+
+  const gracefulShutdown = async (signal: string, error?: unknown) => {
+    if (isShuttingDown) {
+      return;
+    }
+    isShuttingDown = true;
+
+    const stack = error instanceof Error ? error.stack : undefined;
+    logger.fatal(
+      `${signal} received. Starting graceful shutdown.`,
+      stack,
+      error instanceof Error ? { message: error.message } : error,
+    );
+
+    try {
+      await app.close();
+    } catch (closeError) {
+      logger.error(
+        'Error while closing Nest application',
+        closeError instanceof Error ? closeError.stack : undefined,
+        'Bootstrap',
+      );
+    } finally {
+      process.exit(1);
+    }
+  };
+
+  process.on('uncaughtException', (error) => {
+    void gracefulShutdown('uncaughtException', error);
+  });
+  process.on('unhandledRejection', (reason) => {
+    void gracefulShutdown('unhandledRejection', reason);
+  });
+
   await app.listen(port);
-  console.log(`🚀 Server is running on: http://localhost:${port}`);
-  console.log(`Application is running on: http://localhost:${port}/doc`);
+  logger.log(`Server is running on: http://localhost:${port}`, 'Bootstrap');
+  logger.log(`Swagger docs on: http://localhost:${port}/doc`, 'Bootstrap');
 }
 bootstrap();
