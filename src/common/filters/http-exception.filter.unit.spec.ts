@@ -1,13 +1,15 @@
 import { ArgumentsHost, BadRequestException } from '@nestjs/common';
 import { vi } from 'vitest';
 import { HttpExceptionFilter } from './http-exception.filter';
+import { AppLogger } from '../logging/app-logger.service';
+import { NotFoundError } from '../errors/app-error';
 
 describe('HttpExceptionFilter', () => {
   const createHost = (url = '/test') => {
     const status = vi.fn().mockReturnThis();
     const json = vi.fn();
     const response = { status, json };
-    const request = { url };
+    const request = { url, method: 'GET' };
     const host = {
       switchToHttp: () => ({
         getResponse: () => response,
@@ -18,7 +20,8 @@ describe('HttpExceptionFilter', () => {
   };
 
   it('returns expected status and error shape for HttpException', () => {
-    const filter = new HttpExceptionFilter();
+    const logger = { error: vi.fn() } as unknown as AppLogger;
+    const filter = new HttpExceptionFilter(logger);
     const { host, status, json } = createHost('/users');
     const exception = new BadRequestException('Invalid payload');
 
@@ -28,15 +31,30 @@ describe('HttpExceptionFilter', () => {
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({
         statusCode: 400,
+        error: 'Bad Request',
         message: 'Invalid payload',
-        path: '/users',
-        timestamp: expect.any(String),
       }),
     );
   });
 
-  it('returns 500 shape for non-HttpException errors', () => {
-    const filter = new HttpExceptionFilter();
+  it('returns custom status for AppError', () => {
+    const logger = { error: vi.fn() } as unknown as AppLogger;
+    const filter = new HttpExceptionFilter(logger);
+    const { host, status, json } = createHost('/categories');
+
+    filter.catch(new NotFoundError('Category missing'), host);
+
+    expect(status).toHaveBeenCalledWith(404);
+    expect(json).toHaveBeenCalledWith({
+      statusCode: 404,
+      error: 'Not Found',
+      message: 'Category missing',
+    });
+  });
+
+  it('returns 500 shape for unknown errors', () => {
+    const logger = { error: vi.fn() } as unknown as AppLogger;
+    const filter = new HttpExceptionFilter(logger);
     const { host, status, json } = createHost('/articles');
 
     filter.catch(new Error('Boom'), host);
@@ -45,9 +63,8 @@ describe('HttpExceptionFilter', () => {
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({
         statusCode: 500,
-        message: 'Internal server error',
-        path: '/articles',
-        timestamp: expect.any(String),
+        error: 'Internal Server Error',
+        message: 'An unexpected error occurred',
       }),
     );
   });
