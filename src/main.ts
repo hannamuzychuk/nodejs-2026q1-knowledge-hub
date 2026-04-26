@@ -128,18 +128,31 @@ async function bootstrap() {
   const port = process.env.PORT || 4000;
   let isShuttingDown = false;
 
-  const gracefulShutdown = async (signal: string, error?: unknown) => {
+  const gracefulShutdown = async (
+    signal: string,
+    error?: unknown,
+    level: 'fatal' | 'error' = 'fatal',
+  ) => {
     if (isShuttingDown) {
       return;
     }
     isShuttingDown = true;
 
     const stack = error instanceof Error ? error.stack : undefined;
-    logger.fatal(
-      `${signal} received. Starting graceful shutdown.`,
-      stack,
-      error instanceof Error ? { message: error.message } : error,
-    );
+    if (level === 'fatal') {
+      logger.fatal(
+        `${signal} received. Starting graceful shutdown.`,
+        stack,
+        error instanceof Error ? { message: error.message } : error,
+      );
+    } else {
+      logger.error(
+        `${signal} received. Starting graceful shutdown.`,
+        stack,
+        'process',
+        error instanceof Error ? { message: error.message } : error,
+      );
+    }
 
     try {
       await app.close();
@@ -158,7 +171,7 @@ async function bootstrap() {
     void gracefulShutdown('uncaughtException', error);
   });
   process.on('unhandledRejection', (reason) => {
-    void gracefulShutdown('unhandledRejection', reason);
+    void gracefulShutdown('unhandledRejection', reason, 'error');
   });
 
   await app.listen(port);
