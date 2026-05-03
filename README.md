@@ -263,6 +263,106 @@ PORT=4012 LOG_LEVEL=error npm start
 PORT=4010 LOG_MAX_FILE_SIZE=1 npm start
 ```
 
+## Assignment 9 - AI Integration (Gemini)
+
+Gemini API is integrated in a dedicated `AiModule` with HTTP-based calls and DTO validation.
+
+Implemented endpoints:
+
+- `POST /ai/articles/:articleId/summarize`
+- `POST /ai/articles/:articleId/translate`
+- `POST /ai/articles/:articleId/analyze`
+- `POST /ai/generate` (optional free-form generation)
+- `GET /ai/usage` (in-memory usage snapshot since startup)
+
+Model:
+
+- Default model: `gemini-2.0-flash` (configurable by `GEMINI_MODEL`)
+
+### How to get Gemini API key (step-by-step)
+
+1. Open [Google AI Studio](https://aistudio.google.com/).
+2. Sign in with your Google account.
+3. Go to **Get API key**.
+4. Create a new API key in your project.
+5. Copy the key value (visible once in UI).
+
+### Setup after cloning
+
+1. Create local env file:
+
+```bash
+cp .env.example .env
+```
+
+2. In `.env`, set required AI variables:
+
+```env
+GEMINI_API_KEY=your-real-key-here
+GEMINI_API_BASE_URL=https://generativelanguage.googleapis.com
+GEMINI_MODEL=gemini-2.0-flash
+AI_RATE_LIMIT_RPM=20
+AI_CACHE_TTL_SEC=300
+```
+
+3. Run app:
+
+```bash
+npm install
+npx prisma generate
+npx prisma migrate deploy
+npm run start:dev
+```
+
+4. Open Swagger:
+
+- [http://localhost:4000/doc](http://localhost:4000/doc)
+
+### Example AI endpoint calls
+
+Summarize:
+
+```bash
+curl -X POST "http://localhost:4000/ai/articles/<article-uuid>/summarize" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access-token>" \
+  -d '{"maxLength":"medium"}'
+```
+
+Translate:
+
+```bash
+curl -X POST "http://localhost:4000/ai/articles/<article-uuid>/translate" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access-token>" \
+  -d '{"targetLanguage":"Polish"}'
+```
+
+Analyze:
+
+```bash
+curl -X POST "http://localhost:4000/ai/articles/<article-uuid>/analyze" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access-token>" \
+  -d '{"task":"review"}'
+```
+
+### Runtime behavior
+
+- AI rate limit is per IP and configurable by `AI_RATE_LIMIT_RPM` (default `20`).
+- Limit response returns `429` and includes `Retry-After` header.
+- Summarize/translate responses are cached in-memory with deterministic key:
+  article id + request params + article `updatedAt`.
+- Cache TTL is configurable by `AI_CACHE_TTL_SEC` (default `300`).
+- Usage tracking is in-memory (total requests, requests by endpoint, total token usage when available from Gemini metadata).
+
+### Known limitations
+
+- Free Gemini tier has quotas and may return upstream rate limits.
+- Latency depends on current provider load and network.
+- Regional availability may vary by Google account/project settings.
+- AI cache and usage tracking reset on service restart (in-memory only).
+
 ## Prisma Commands
 
 ```bash
