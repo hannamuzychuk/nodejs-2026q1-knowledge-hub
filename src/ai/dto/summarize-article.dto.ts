@@ -8,6 +8,8 @@ export class SummarizeArticleRequestDto {
   @ApiPropertyOptional({
     enum: summaryLengthOptions,
     default: 'medium',
+    example: 'medium',
+    description: 'One of: short | medium | detailed',
   })
   @IsOptional()
   @IsIn(summaryLengthOptions)

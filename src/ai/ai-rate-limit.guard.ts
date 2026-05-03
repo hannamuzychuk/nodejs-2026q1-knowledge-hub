@@ -19,11 +19,16 @@ export class AiRateLimitGuard implements CanActivate {
     const now = Date.now();
     const ip = this.resolveIp(request);
     const timestamps = this.requestsByIp.get(ip) || [];
-    const fresh = timestamps.filter((timestamp) => now - timestamp < this.windowMs);
+    const fresh = timestamps.filter(
+      (timestamp) => now - timestamp < this.windowMs,
+    );
 
     if (fresh.length >= this.limitPerMinute) {
       const oldestAllowed = fresh[0] + this.windowMs;
-      const retryAfterSec = Math.max(1, Math.ceil((oldestAllowed - now) / 1000));
+      const retryAfterSec = Math.max(
+        1,
+        Math.ceil((oldestAllowed - now) / 1000),
+      );
       response.setHeader('Retry-After', String(retryAfterSec));
       throw new HttpException(
         `AI rate limit exceeded. Try again in ${retryAfterSec} seconds.`,

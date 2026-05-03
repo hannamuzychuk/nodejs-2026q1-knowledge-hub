@@ -16,6 +16,8 @@ export class AnalyzeArticleRequestDto {
   @ApiPropertyOptional({
     enum: analyzeTaskOptions,
     default: 'review',
+    example: 'review',
+    description: 'One of: review | bugs | optimize | explain',
   })
   @IsOptional()
   @IsIn(analyzeTaskOptions)
