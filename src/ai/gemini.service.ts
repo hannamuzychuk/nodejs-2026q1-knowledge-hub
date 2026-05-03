@@ -3,14 +3,9 @@ import {
   HttpStatus,
   Injectable,
   InternalServerErrorException,
+  Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { AppLogger } from '../common/logging/app-logger.service';
-
-type GeminiRequestOptions = {
-  prompt: string;
-  systemInstruction?: string;
-};
 
 type GeminiGenerateResult = {
   text: string;
@@ -28,8 +23,14 @@ type GeminiApiResponse = {
   };
 };
 
+export type GeminiContentPart = {
+  role: 'user' | 'model';
+  text: string;
+};
+
 @Injectable()
 export class GeminiService {
+  private readonly logger = new Logger(GeminiService.name);
   private readonly apiKey = process.env.GEMINI_API_KEY || '';
   private readonly baseUrl =
     process.env.GEMINI_API_BASE_URL ||
@@ -38,9 +39,36 @@ export class GeminiService {
   private readonly timeoutMs = 12_000;
   private readonly maxRetries = 3;
 
-  constructor(private readonly logger: AppLogger) {}
+  async generate(options: {
+    prompt: string;
+    systemInstruction?: string;
+  }): Promise<GeminiGenerateResult> {
+    return this.generateFromContents(
+      [{ role: 'user', text: options.prompt }],
+      options.systemInstruction,
+    );
+  }
 
-  async generate(options: GeminiRequestOptions): Promise<GeminiGenerateResult> {
+  /**
+   * Multi-turn chat: prior turns plus the new user message (caller appends the new prompt as last user turn in `priorAndUser` or we pass separately).
+   * Here: `priorTurns` are completed exchanges; `userMessage` is the new prompt.
+   */
+  async generateWithConversation(
+    priorTurns: GeminiContentPart[],
+    userMessage: string,
+    systemInstruction?: string,
+  ): Promise<GeminiGenerateResult> {
+    const contents: GeminiContentPart[] = [
+      ...priorTurns,
+      { role: 'user', text: userMessage },
+    ];
+    return this.generateFromContents(contents, systemInstruction);
+  }
+
+  private async generateFromContents(
+    contents: GeminiContentPart[],
+    systemInstruction?: string | undefined,
+  ): Promise<GeminiGenerateResult> {
     if (!this.apiKey.trim()) {
       throw new InternalServerErrorException(
         'Gemini API key is not configured on the server.',
@@ -49,15 +77,14 @@ export class GeminiService {
 
     const endpoint = `${this.baseUrl}/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
     const payload: Record<string, unknown> = {
-      contents: [
-        {
-          parts: [{ text: options.prompt }],
-        },
-      ],
+      contents: contents.map((c) => ({
+        role: c.role,
+        parts: [{ text: c.text }],
+      })),
     };
-    if (options.systemInstruction) {
+    if (systemInstruction) {
       payload.systemInstruction = {
-        parts: [{ text: options.systemInstruction }],
+        parts: [{ text: systemInstruction }],
       };
     }
 
@@ -110,12 +137,7 @@ export class GeminiService {
       if (!response.ok) {
         const status = response.status;
         if (status === HttpStatus.UNAUTHORIZED || status === HttpStatus.FORBIDDEN) {
-          this.logger.error(
-            'Gemini authentication failed',
-            undefined,
-            'GeminiService',
-            { status },
-          );
+          this.logger.error(`Gemini authentication failed (HTTP ${status})`);
           throw new InternalServerErrorException(
             'AI provider authentication failed.',
           );
