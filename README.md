@@ -109,7 +109,7 @@ App URLs:
 
 - Runtime: Node `24.10.0` (pinned in `package.json` and `.nvmrc`)
 - Build command: `npm ci && npx prisma generate && npm run build`
-- Start command: `npx prisma migrate deploy && node dist/src/main.js`
+- Start command: `npx prisma migrate deploy && node dist/main.js`
 - Required env on the Render **Web Service**:
   - `DATABASE_URL` must be a real Postgres URL (`postgresql://...`), never `localhost`
   - `JWT_SECRET`, `JWT_REFRESH_SECRET`, `CRYPT_SALT`
@@ -132,19 +132,32 @@ Adminer URL: http://localhost:8080
 
 ## Testing
 
-Important: E2E tests in this project send HTTP requests to `localhost:4000`, so API must be running while tests execute.
+Important: E2E tests in this project send HTTP requests to `localhost:4000` (or `PORT` from `.env`), so the API must be running while tests execute.
 
-For `npm run test:auth`, `test:refresh`, and `test:rbac`, the Jest process sets `JWT_SECRET` and `JWT_SECRET_REFRESH_KEY`. The **running API must use the same values** (in `.env` or the shell that starts `npm run start:dev`), otherwise login/refresh checks and tests that mint JWTs will fail.
+For `npm run test:auth`, `test:refresh`, and `test:rbac`, the Jest process sets `JWT_SECRET` and `JWT_SECRET_REFRESH_KEY`. The **running API must use the same values** (in `.env` or in the shell that starts the server), otherwise login/refresh checks and tests that mint JWTs will fail.
 
-The e2e fixture user `TEST_AUTH_LOGIN` is promoted to admin **when the API is not in `NODE_ENV=production`**, so Jest does not need to pass `TEST_MODE` into the server process for local runs. In production, that login behaves like a normal user unless you explicitly set `TEST_MODE=auth` on the server (e.g. CI).
+**`TEST_MODE=auth` on the server:** `JwtRbacGuard` intentionally skips JWT checks in non-production when `TEST_MODE` is unset (legacy e2e convenience). The suites under `test/auth/*.e2e.spec.ts` expect **401 without a Bearer token**, so for `npm run test:auth` the API process must see `TEST_MODE=auth`. The easiest way is a dedicated dev server:
+
+```bash
+# Terminal A — same JWT vars as Jest + enforced auth
+npm run start:dev:e2e
+
+# Terminal B
+npm run test:auth
+```
+
+The e2e fixture user `TEST_AUTH_LOGIN` is still promoted to admin when the API is not in `NODE_ENV=production` (see auth service); that is separate from the `TEST_MODE=auth` guard behavior above.
 
 Recommended commands for this branch:
 
 ```bash
+npm run start:dev:e2e   # terminal A, then:
 npm run test:auth
 npm run test:refresh
 npm run test:rbac
 ```
+
+**Live Gemini** (Jest + running API): `test/ai/articles-summarize.e2e.spec.ts`, `articles-translate`, and `articles-analyze` always call AI for a persisted article. Without `GEMINI_E2E`, the suite **passes** on either **200** (Gemini OK) or typical AI-layer errors (**500/503/502/429**) when the key is missing or the provider fails. Set **`GEMINI_E2E=1`** in the Jest terminal (e.g. `GEMINI_E2E=1 npm run test:auth`) to **require** HTTP **200** and full response-shape assertions—use this when the server has a working `GEMINI_API_KEY`.
 
 Additional:
 
@@ -275,9 +288,12 @@ Implemented endpoints:
 - `POST /ai/generate` (optional free-form generation)
 - `GET /ai/usage` (in-memory usage snapshot since startup)
 
+Request validation: global `ValidationPipe` in `main.ts` plus per-route DTOs (`ArticleIdParamDto` with `@IsUUID()`, summarize/translate/analyze/generate bodies). E2E checks for **400** (invalid param/body) and **404** (unknown article) live under `test/ai/*.e2e.spec.ts` (run with `npm run start:dev:e2e` + `npm run test:auth`).
+
 Model:
 
 - Default model: `gemini-2.0-flash` (configurable by `GEMINI_MODEL`)
+- `GEMINI_API_KEY` is read at runtime from the environment (see `src/ai/gemini.service.ts`); Vitest covers missing key, default model URL, and custom `GEMINI_MODEL` / `GEMINI_API_BASE_URL` (`src/ai/gemini.service.unit.spec.ts`).
 
 ### How to get Gemini API key (step-by-step)
 
@@ -303,6 +319,8 @@ GEMINI_API_BASE_URL=https://generativelanguage.googleapis.com
 GEMINI_MODEL=gemini-2.0-flash
 AI_RATE_LIMIT_RPM=20
 AI_CACHE_TTL_SEC=300
+AI_SESSION_TTL_MS=1800000
+AI_SESSION_MAX_TURNS=24
 ```
 
 3. Run app:
@@ -316,7 +334,82 @@ npm run start:dev
 
 4. Open Swagger:
 
-- [http://localhost:4000/doc](http://localhost:4000/doc)
+- [http://localhost:4000/doc](http://localhost:4000/doc) (use your `PORT` from `.env` if not `4000`)
+
+### Swagger examples (`/doc`) — auth, article id, AI **200**
+
+Use this flow for a **screenshot** (tag **ai** + successful **200**) or manual smoke tests. The server must have a valid **`GEMINI_API_KEY`** for AI routes to return **200**.
+
+The **ai** routes in Swagger also show **sample values** (path `articleId`, JSON bodies) from `@ApiParam` / `@ApiProperty` `example` fields in the DTOs — replace `articleId` with a real id from **`GET /article`** before expecting **200**.
+
+1. **`auth` → `POST /auth/signup`** — example request body:
+
+```json
+{
+  "login": "swagger_demo_user",
+  "password": "Secret12"
+}
+```
+
+If login is already taken, use another unique `login` string or call **`POST /auth/login`** with the same credentials.
+
+2. **`auth` → `POST /auth/login`** — same body as signup. Copy **`accessToken`** from the response.
+
+3. Click **Authorize** (lock icon) at the top of Swagger → **Value**: `Bearer <paste_accessToken_here>` → **Authorize** → **Close**.
+
+4. **`article` → `GET /article`** → **Execute**. From the JSON array, copy any object’s **`id`** (a UUID). That value is your `{articleId}`.
+
+5. **`ai` → `POST /ai/articles/{articleId}/summarize`** — paste the UUID into `articleId`. Example body:
+
+```json
+{
+  "maxLength": "medium"
+}
+```
+
+**Execute** → expect **200** and fields such as `summary`, `articleId`, `originalLength`, `summaryLength`.
+
+6. **`ai` → `POST /ai/articles/{articleId}/translate`** — same `articleId`. Example body:
+
+```json
+{
+  "targetLanguage": "Polish"
+}
+```
+
+Optional: `"sourceLanguage": "English"`.
+
+7. **`ai` → `POST /ai/articles/{articleId}/analyze`** — same `articleId`. Example body:
+
+```json
+{
+  "task": "review"
+}
+```
+
+Allowed `task` values: `review`, `bugs`, `optimize`, `explain` (see DTO / Swagger enum).
+
+8. **`ai` → `POST /ai/generate`** — example body:
+
+```json
+{
+  "prompt": "Say hello in one short sentence.",
+  "systemInstruction": "You are a concise assistant."
+}
+```
+
+Follow-up in the same conversation — add **`sessionId`** copied from the **previous** `generate` response (must be a UUID):
+
+```json
+{
+  "prompt": "What was my first message about?",
+  "sessionId": "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+}
+```
+
+Replace `sessionId` with the **`sessionId`** returned by your previous **`POST /ai/generate`** call (the UUID above is only an example of the required format).
+
+9. **`ai` → `GET /ai/usage`** — **Execute** with no body → **200** JSON with `totalRequests`, `requestsByEndpoint`, `observability`, etc.
 
 ### Example AI endpoint calls
 
@@ -349,12 +442,28 @@ curl -X POST "http://localhost:4000/ai/articles/<article-uuid>/analyze" \
 
 ### Runtime behavior
 
-- AI rate limit is per IP and configurable by `AI_RATE_LIMIT_RPM` (default `20`).
+- All `AiController` routes are protected by `AiRateLimitGuard` (`@UseGuards` on the controller in `src/ai/ai.controller.ts`).
+- AI rate limit is per IP and configurable by `AI_RATE_LIMIT_RPM` (default `20`; non‑positive or non‑numeric values fall back to `20`, see `src/ai/ai-rate-limit.guard.ts` and unit tests).
 - Limit response returns `429` and includes `Retry-After` header.
 - Summarize/translate responses are cached in-memory with deterministic key:
   article id + request params + article `updatedAt`.
 - Cache TTL is configurable by `AI_CACHE_TTL_SEC` (default `300`).
-- Usage tracking is in-memory (total requests, requests by endpoint, total token usage when available from Gemini metadata).
+- Usage tracking is in-memory: **totals** (`totalRequests`, `totalTokens` when Gemini reports usage), **per-endpoint request counts** (`requestsByEndpoint`), and optional **per-endpoint token sums** (`tokensByEndpoint`).
+- `GET /ai/usage` returns that snapshot plus **observability**: per-endpoint average Gemini latency (`geminiLatencyMsByEndpoint`), summarize/translate **cache hit ratios** and hit/miss counts, and **activeAiSessions** (in-memory conversation contexts).
+- `POST /ai/generate` accepts optional `sessionId` (UUID returned from a previous generate call on this instance). The server keeps a short sliding window of prior user/model turns (TTL `AI_SESSION_TTL_MS`, max turns `AI_SESSION_MAX_TURNS`) and sends them to Gemini for multi-turn context.
+- Structured model outputs (**translate** / **analyze** JSON, optional `{ "summary": "..." }` for summarize) are validated with **safe fallbacks** when parsing or schema fields fail.
+
+### Gemini error handling
+
+`GeminiService` maps provider and network failures to stable HTTP responses (no raw upstream stack traces):
+
+- **Timeouts:** each request uses `AbortSignal` (~12s); aborts and common `TypeError` network failures become **503** with a short message (`AI service timeout or network error.`).
+- **Auth / key issues:** HTTP **401** / **403**, or JSON `error.status` of `UNAUTHENTICATED` / `PERMISSION_DENIED` (including rare **200** bodies that only carry `error`), become **500** with `AI provider authentication failed.` — useful logs include the upstream message when present.
+- **Rate limits:** HTTP **429** or `RESOURCE_EXHAUSTED` triggers **exponential backoff retries** (up to 3 attempts); if still limited, clients get **503** with `AI upstream is rate-limited. Please try again later.`
+- **Upstream 5xx / 502:** mapped to **503** `AI upstream is temporarily unavailable.`
+- **Invalid input (HTTP 400):** mapped to **400** `BadRequestException`, optionally with a truncated upstream `error.message`.
+
+Unit coverage: `src/ai/gemini.service.unit.spec.ts` (timeout, network, 401/403, 429 + retry, exhausted 429, 5xx, 400, and error-in-JSON edge cases).
 
 ### Known limitations
 

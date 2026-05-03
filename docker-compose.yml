@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
     container_name: kh-api
 
-    command: ["node", "dist/src/main.js"]
+    command: ["node", "dist/main.js"]
     restart: on-failure
     depends_on:
       db:

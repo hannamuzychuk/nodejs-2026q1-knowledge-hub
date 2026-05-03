@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { validate } from 'uuid';
 import { StatusCodes } from 'http-status-codes';
 import { request } from './lib';
@@ -12,13 +13,13 @@ import {
   commentsRoutes,
 } from './endpoints';
 
+
+const nonExistentUserId = '0a35dd62-e09f-444b-a628-f4e7c6954f57';
+
 const createUserDto = {
-  login: 'TEST_LOGIN',
+  login: `TEST_LOGIN_${randomUUID()}`,
   password: 'TEST_PASSWORD',
 };
-
-// Probability of collisions for UUID is almost zero
-const randomUUID = '0a35dd62-e09f-444b-a628-f4e7c6954f57';
 
 describe('Users (e2e)', () => {
   const unauthorizedRequest = request;
@@ -87,7 +88,7 @@ describe('Users (e2e)', () => {
 
     it("should respond with NOT_FOUND status code in case if user doesn't exist", async () => {
       const response = await unauthorizedRequest
-        .get(usersRoutes.getById(randomUUID))
+        .get(usersRoutes.getById(nonExistentUserId))
         .set(commonHeaders);
 
       expect(response.status).toBe(StatusCodes.NOT_FOUND);
@@ -221,7 +222,7 @@ describe('Users (e2e)', () => {
 
     it('should respond with BAD_REQUEST status code in case of invalid dto', async () => {
       const response = await unauthorizedRequest
-        .put(usersRoutes.update(randomUUID))
+        .put(usersRoutes.update(nonExistentUserId))
         .set(commonHeaders)
         .send({});
 
@@ -230,7 +231,7 @@ describe('Users (e2e)', () => {
 
     it("should respond with NOT_FOUND status code in case if user doesn't exist", async () => {
       const response = await unauthorizedRequest
-        .put(usersRoutes.update(randomUUID))
+        .put(usersRoutes.update(nonExistentUserId))
         .set(commonHeaders)
         .send({
           oldPassword: 'test',
@@ -275,7 +276,7 @@ describe('Users (e2e)', () => {
 
     it("should respond with NOT_FOUND status code in case if user doesn't exist", async () => {
       const response = await unauthorizedRequest
-        .delete(usersRoutes.delete(randomUUID))
+        .delete(usersRoutes.delete(nonExistentUserId))
         .set(commonHeaders);
 
       expect(response.status).toBe(StatusCodes.NOT_FOUND);
