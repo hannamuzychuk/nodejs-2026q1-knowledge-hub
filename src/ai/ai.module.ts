@@ -6,6 +6,7 @@ import { GeminiService } from './gemini.service';
 import { AiCacheService } from './ai-cache.service';
 import { AiUsageService } from './ai-usage.service';
 import { AiRateLimitGuard } from './ai-rate-limit.guard';
+import { AiConversationService } from './ai-conversation.service';
 
 @Module({
   imports: [ArticleModule],
@@ -15,6 +16,7 @@ import { AiRateLimitGuard } from './ai-rate-limit.guard';
     GeminiService,
     AiCacheService,
     AiUsageService,
+    AiConversationService,
     AiRateLimitGuard,
   ],
 })

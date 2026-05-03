@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -20,6 +21,11 @@ type GeminiApiResponse = {
   }>;
   usageMetadata?: {
     totalTokenCount?: number;
+  };
+  error?: {
+    code?: number;
+    message?: string;
+    status?: string;
   };
 };
 
@@ -94,6 +100,7 @@ export class GeminiService {
       try {
         const response = await this.fetchWithTimeout(endpoint, payload);
         const body = (await response.json()) as GeminiApiResponse;
+        this.throwIfGeminiErrorPayload(body);
         const text = this.extractText(body);
         return {
           text,
@@ -123,7 +130,10 @@ export class GeminiService {
     );
   }
 
-  private async fetchWithTimeout(url: string, payload: Record<string, unknown>) {
+  private async fetchWithTimeout(
+    url: string,
+    payload: Record<string, unknown>,
+  ) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
@@ -136,19 +146,51 @@ export class GeminiService {
 
       if (!response.ok) {
         const status = response.status;
-        if (status === HttpStatus.UNAUTHORIZED || status === HttpStatus.FORBIDDEN) {
-          this.logger.error(`Gemini authentication failed (HTTP ${status})`);
+        const errPayload = await this.tryReadGeminiErrorJson(response);
+        const errStatus = errPayload?.error?.status;
+        const errMessage = errPayload?.error?.message;
+
+        if (
+          status === HttpStatus.UNAUTHORIZED ||
+          status === HttpStatus.FORBIDDEN ||
+          errStatus === 'UNAUTHENTICATED' ||
+          errStatus === 'PERMISSION_DENIED'
+        ) {
+          this.logger.error(
+            `Gemini authentication failed (HTTP ${status})${errMessage ? `: ${errMessage}` : ''}`,
+          );
           throw new InternalServerErrorException(
             'AI provider authentication failed.',
           );
         }
-        if (status === HttpStatus.TOO_MANY_REQUESTS) {
-          throw new HttpException('Gemini rate limited', HttpStatus.TOO_MANY_REQUESTS);
+        if (
+          status === HttpStatus.TOO_MANY_REQUESTS ||
+          errStatus === 'RESOURCE_EXHAUSTED'
+        ) {
+          if (errMessage) {
+            this.logger.warn(`Gemini rate limit: ${errMessage}`);
+          }
+          throw new HttpException(
+            'Gemini rate limited',
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
         }
         if (status >= 500) {
+          if (errMessage) {
+            this.logger.warn(`Gemini upstream ${status}: ${errMessage}`);
+          }
           throw new ServiceUnavailableException(
             'AI upstream is temporarily unavailable.',
           );
+        }
+        if (status === HttpStatus.BAD_REQUEST) {
+          throw new BadRequestException(
+            errMessage?.slice(0, 240) ||
+              'AI could not process the request (invalid input).',
+          );
+        }
+        if (errMessage) {
+          this.logger.warn(`Gemini request failed (HTTP ${status}): ${errMessage}`);
         }
         throw new InternalServerErrorException('AI request failed.');
       }
@@ -169,6 +211,47 @@ export class GeminiService {
       throw new ServiceUnavailableException('AI service request failed.');
     } finally {
       clearTimeout(timeout);
+    }
+  }
+
+  private throwIfGeminiErrorPayload(body: GeminiApiResponse) {
+    const err = body.error;
+    if (!err) {
+      return;
+    }
+    const st = err.status;
+    const code = err.code;
+    if (st === 'RESOURCE_EXHAUSTED' || code === 429) {
+      this.logger.warn(`Gemini rate limit (payload): ${err.message || st}`);
+      throw new HttpException(
+        'Gemini rate limited',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    if (
+      st === 'PERMISSION_DENIED' ||
+      st === 'UNAUTHENTICATED' ||
+      code === 401 ||
+      code === 403
+    ) {
+      this.logger.error(
+        `Gemini authentication failed (${st || code}): ${err.message || ''}`,
+      );
+      throw new InternalServerErrorException(
+        'AI provider authentication failed.',
+      );
+    }
+    this.logger.warn(`Gemini error payload: ${err.message || st || 'unknown'}`);
+    throw new ServiceUnavailableException(
+      'AI provider rejected the request.',
+    );
+  }
+
+  private async tryReadGeminiErrorJson(response: Response) {
+    try {
+      return (await response.json()) as GeminiApiResponse;
+    } catch {
+      return undefined;
     }
   }
 

@@ -1,7 +1,4 @@
-import {
-  AnalyzeTaskOption,
-  severityOptions,
-} from '../dto/analyze-article.dto';
+import { AnalyzeTaskOption, severityOptions } from '../dto/analyze-article.dto';
 import { SummaryLengthOption } from '../dto/summarize-article.dto';
 
 const summaryLengthHints: Record<SummaryLengthOption, string> = {

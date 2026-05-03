@@ -3,7 +3,6 @@ import { ArticleService } from '../article/article.service';
 import {
   AnalyzeArticleRequestDto,
   AnalyzeArticleResponseDto,
-  severityOptions,
 } from './dto/analyze-article.dto';
 import {
   SummarizeArticleRequestDto,
@@ -13,6 +12,7 @@ import {
   TranslateArticleRequestDto,
   TranslateArticleResponseDto,
 } from './dto/translate-article.dto';
+import { GenerateRequestDto } from './dto/generate.dto';
 import {
   buildAnalyzePrompt,
   buildSummarizePrompt,
@@ -21,6 +21,12 @@ import {
 import { GeminiService } from './gemini.service';
 import { AiCacheService } from './ai-cache.service';
 import { AiUsageService } from './ai-usage.service';
+import { AiConversationService } from './ai-conversation.service';
+import {
+  normalizeSummarizeOutput,
+  validateAnalyzeStructured,
+  validateTranslateStructured,
+} from './validation/structured-ai-output';
 
 type JsonMap = Record<string, unknown>;
 
@@ -31,6 +37,7 @@ export class AiService {
     private readonly geminiService: GeminiService,
     private readonly cacheService: AiCacheService,
     private readonly usageService: AiUsageService,
+    private readonly conversationService: AiConversationService,
   ) {}
 
   async summarizeArticle(
@@ -39,25 +46,41 @@ export class AiService {
   ): Promise<SummarizeArticleResponseDto> {
     const article = await this.articleService.findOne(articleId);
     const maxLength = body.maxLength || 'medium';
-    const cacheKey = this.buildCacheKey('summarize', article.id, article.updatedAt, {
-      maxLength,
-    });
-    const fromCache = this.cacheService.get<SummarizeArticleResponseDto>(cacheKey);
+    const cacheKey = this.buildCacheKey(
+      'summarize',
+      article.id,
+      article.updatedAt,
+      {
+        maxLength,
+      },
+    );
+    const fromCache =
+      this.cacheService.get<SummarizeArticleResponseDto>(cacheKey);
     if (fromCache) {
+      this.usageService.recordCacheResult('summarize', true);
       return fromCache;
     }
+    this.usageService.recordCacheResult('summarize', false);
 
-    const prompt = buildSummarizePrompt(article.title, article.content, maxLength);
+    const prompt = buildSummarizePrompt(
+      article.title,
+      article.content,
+      maxLength,
+    );
+    const endpoint = 'POST /ai/articles/:articleId/summarize';
+    const t0 = Date.now();
     const generated = await this.geminiService.generate({ prompt });
+    this.usageService.recordGeminiLatency(endpoint, Date.now() - t0);
 
+    const summaryText = normalizeSummarizeOutput(generated.text);
     const response: SummarizeArticleResponseDto = {
       articleId: article.id,
-      summary: generated.text,
+      summary: summaryText,
       originalLength: article.content.length,
-      summaryLength: generated.text.length,
+      summaryLength: summaryText.length,
     };
     this.cacheService.set(cacheKey, response);
-    this.usageService.trackRequest('POST /ai/articles/:articleId/summarize', generated.tokenUsage);
+    this.usageService.trackRequest(endpoint, generated.tokenUsage);
     return response;
   }
 
@@ -66,14 +89,22 @@ export class AiService {
     body: TranslateArticleRequestDto,
   ): Promise<TranslateArticleResponseDto> {
     const article = await this.articleService.findOne(articleId);
-    const cacheKey = this.buildCacheKey('translate', article.id, article.updatedAt, {
-      targetLanguage: body.targetLanguage,
-      sourceLanguage: body.sourceLanguage || '',
-    });
-    const fromCache = this.cacheService.get<TranslateArticleResponseDto>(cacheKey);
+    const cacheKey = this.buildCacheKey(
+      'translate',
+      article.id,
+      article.updatedAt,
+      {
+        targetLanguage: body.targetLanguage,
+        sourceLanguage: body.sourceLanguage || '',
+      },
+    );
+    const fromCache =
+      this.cacheService.get<TranslateArticleResponseDto>(cacheKey);
     if (fromCache) {
+      this.usageService.recordCacheResult('translate', true);
       return fromCache;
     }
+    this.usageService.recordCacheResult('translate', false);
 
     const prompt = buildTranslatePrompt(
       article.title,
@@ -81,16 +112,20 @@ export class AiService {
       body.targetLanguage,
       body.sourceLanguage,
     );
+    const endpoint = 'POST /ai/articles/:articleId/translate';
+    const t0 = Date.now();
     const generated = await this.geminiService.generate({ prompt });
-    const parsed = this.parseJson(generated.text);
+    this.usageService.recordGeminiLatency(endpoint, Date.now() - t0);
+
+    const structured = validateTranslateStructured(generated.text);
     const response: TranslateArticleResponseDto = {
       articleId: article.id,
-      translatedText: this.readString(parsed, 'translatedText', generated.text),
-      detectedLanguage: this.readString(parsed, 'detectedLanguage', 'unknown'),
+      translatedText: structured.translatedText,
+      detectedLanguage: structured.detectedLanguage,
     };
 
     this.cacheService.set(cacheKey, response);
-    this.usageService.trackRequest('POST /ai/articles/:articleId/translate', generated.tokenUsage);
+    this.usageService.trackRequest(endpoint, generated.tokenUsage);
     return response;
   }
 
@@ -101,33 +136,53 @@ export class AiService {
     const article = await this.articleService.findOne(articleId);
     const task = body.task || 'review';
     const prompt = buildAnalyzePrompt(article.title, article.content, task);
+    const endpoint = 'POST /ai/articles/:articleId/analyze';
+    const t0 = Date.now();
     const generated = await this.geminiService.generate({ prompt });
-    const parsed = this.parseJson(generated.text);
+    this.usageService.recordGeminiLatency(endpoint, Date.now() - t0);
 
-    const severityCandidate = this.readString(parsed, 'severity', 'info');
-    const severity = severityOptions.includes(severityCandidate as (typeof severityOptions)[number])
-      ? (severityCandidate as 'info' | 'warning' | 'error')
-      : 'info';
-    const suggestions = this.readArrayOfStrings(parsed, 'suggestions');
+    const structured = validateAnalyzeStructured(generated.text);
 
     const response: AnalyzeArticleResponseDto = {
       articleId: article.id,
-      analysis: this.readString(parsed, 'analysis', generated.text),
-      suggestions: suggestions.length > 0 ? suggestions : ['No suggestions returned by AI.'],
-      severity,
+      analysis: structured.analysis,
+      suggestions: structured.suggestions,
+      severity: structured.severity,
     };
-    this.usageService.trackRequest('POST /ai/articles/:articleId/analyze', generated.tokenUsage);
+    this.usageService.trackRequest(endpoint, generated.tokenUsage);
     return response;
   }
 
-  async generate(prompt: string, systemInstruction?: string) {
-    const generated = await this.geminiService.generate({ prompt, systemInstruction });
-    this.usageService.trackRequest('POST /ai/generate', generated.tokenUsage);
-    return { output: generated.text };
+  async generate(body: GenerateRequestDto) {
+    const { sessionId, priorTurns } = this.conversationService.resolveSession(
+      body.sessionId,
+    );
+    const endpoint = 'POST /ai/generate';
+    const t0 = Date.now();
+    const generated = await this.geminiService.generateWithConversation(
+      priorTurns,
+      body.prompt,
+      body.systemInstruction,
+    );
+    this.usageService.recordGeminiLatency(endpoint, Date.now() - t0);
+    this.conversationService.recordExchange(
+      sessionId,
+      body.prompt,
+      generated.text,
+    );
+    this.usageService.trackRequest(endpoint, generated.tokenUsage);
+    return { output: generated.text, sessionId };
   }
 
   getUsageSnapshot() {
-    return this.usageService.snapshot();
+    const snap = this.usageService.snapshot();
+    return {
+      ...snap,
+      observability: {
+        ...snap.observability,
+        activeAiSessions: this.conversationService.getActiveSessionCount(),
+      },
+    };
   }
 
   private buildCacheKey(
@@ -142,31 +197,5 @@ export class AiService {
       updatedAt: updatedAt.toISOString(),
       requestParams,
     });
-  }
-
-  private parseJson(input: string): JsonMap {
-    const cleaned = input
-      .trim()
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/\s*```$/, '');
-    try {
-      return JSON.parse(cleaned) as JsonMap;
-    } catch {
-      return {};
-    }
-  }
-
-  private readString(source: JsonMap, key: string, fallback: string): string {
-    const value = source[key];
-    return typeof value === 'string' && value.trim() ? value : fallback;
-  }
-
-  private readArrayOfStrings(source: JsonMap, key: string): string[] {
-    const value = source[key];
-    if (!Array.isArray(value)) {
-      return [];
-    }
-    return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
   }
 }

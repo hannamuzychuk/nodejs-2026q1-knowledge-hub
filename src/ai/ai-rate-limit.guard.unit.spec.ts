@@ -49,4 +49,24 @@ describe('AiRateLimitGuard', () => {
       expect(Number(headers['Retry-After'])).toBeGreaterThanOrEqual(1);
     }
   });
+
+  it('falls back to 20 RPM when AI_RATE_LIMIT_RPM is not a positive number', () => {
+    process.env.AI_RATE_LIMIT_RPM = 'not-a-number';
+    const guard = new AiRateLimitGuard();
+    const headers: Record<string, string> = {};
+    const ctx = () => createContext('10.20.30.40', headers);
+
+    for (let i = 0; i < 20; i += 1) {
+      expect(guard.canActivate(ctx())).toBe(true);
+    }
+
+    try {
+      guard.canActivate(ctx());
+      throw new Error('Expected guard to throw HttpException');
+    } catch (error) {
+      expect(error).toBeInstanceOf(HttpException);
+      expect((error as HttpException).getStatus()).toBe(429);
+      expect(Number(headers['Retry-After'])).toBeGreaterThanOrEqual(1);
+    }
+  });
 });

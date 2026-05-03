@@ -1,14 +1,8 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBody,
   ApiOperation,
+  ApiParam,
   ApiResponse,
   ApiTags,
   ApiTooManyRequestsResponse,
@@ -26,7 +20,10 @@ import {
   AnalyzeArticleRequestDto,
   AnalyzeArticleResponseDto,
 } from './dto/analyze-article.dto';
-import { ArticleIdParamDto } from './dto/article-id-param.dto';
+import {
+  ArticleIdParamDto,
+  swaggerExampleArticleId,
+} from './dto/article-id-param.dto';
 import { AiRateLimitGuard } from './ai-rate-limit.guard';
 import { GenerateRequestDto, GenerateResponseDto } from './dto/generate.dto';
 
@@ -51,6 +48,12 @@ export class AiController {
 
   @Post('articles/:articleId/translate')
   @ApiOperation({ summary: 'Translate an existing article' })
+  @ApiParam({
+    name: 'articleId',
+    example: swaggerExampleArticleId,
+    description:
+      'Article UUID — copy a real `id` from GET /article (example value is format-only until replaced).',
+  })
   @ApiBody({ type: TranslateArticleRequestDto })
   @ApiResponse({ status: 200, type: TranslateArticleResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid request' })
@@ -65,6 +68,12 @@ export class AiController {
 
   @Post('articles/:articleId/analyze')
   @ApiOperation({ summary: 'Analyze article content and suggestions' })
+  @ApiParam({
+    name: 'articleId',
+    example: swaggerExampleArticleId,
+    description:
+      'Article UUID — copy a real `id` from GET /article (example value is format-only until replaced).',
+  })
   @ApiBody({ type: AnalyzeArticleRequestDto, required: false })
   @ApiResponse({ status: 200, type: AnalyzeArticleResponseDto })
   @ApiResponse({ status: 404, description: 'Article not found' })
@@ -82,7 +91,7 @@ export class AiController {
   @ApiResponse({ status: 200, type: GenerateResponseDto })
   @ApiTooManyRequestsResponse({ description: 'AI rate limit exceeded' })
   generate(@Body() body: GenerateRequestDto) {
-    return this.aiService.generate(body.prompt, body.systemInstruction);
+    return this.aiService.generate(body);
   }
 
   @Get('usage')
