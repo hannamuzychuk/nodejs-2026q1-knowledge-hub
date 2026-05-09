@@ -40,9 +40,8 @@ describe('QdrantRepository', () => {
   it('ensures collection with cosine distance', async () => {
     const repo = new QdrantRepository();
     await repo.ensureCollection(768);
-    const [url, request] = (
-      globalThis.fetch as ReturnType<typeof vi.fn>
-    ).mock.calls[0] as [string, RequestInit];
+    const [url, request] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
+      .calls[0] as [string, RequestInit];
     expect(url).toBe('http://vectordb.test:6333/collections/kh_test_vectors');
     expect(request.method).toBe('PUT');
     expect(String(request.body)).toContain('"distance":"Cosine"');
@@ -64,9 +63,8 @@ describe('QdrantRepository', () => {
       },
     ]);
 
-    const [url, request] = (
-      globalThis.fetch as ReturnType<typeof vi.fn>
-    ).mock.calls[0] as [string, RequestInit];
+    const [url, request] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
+      .calls[0] as [string, RequestInit];
     expect(url).toBe(
       'http://vectordb.test:6333/collections/kh_test_vectors/points?wait=true',
     );
@@ -111,9 +109,8 @@ describe('QdrantRepository', () => {
         },
       },
     ]);
-    const [, request] = (
-      globalThis.fetch as ReturnType<typeof vi.fn>
-    ).mock.calls[0] as [string, RequestInit];
+    const [, request] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
+      .calls[0] as [string, RequestInit];
     expect(String(request.body)).toContain('"articleStatus"');
     expect(String(request.body)).toContain('"categoryId"');
     expect(String(request.body)).toContain('"tags"');

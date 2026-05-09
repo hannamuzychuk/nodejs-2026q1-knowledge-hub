@@ -146,7 +146,11 @@ export class RagService {
       categoryId: body.categoryId,
       tags: body.tags,
     });
-    const lexicalMatches = await this.lexicalSearch(body.query, body, limit * 3);
+    const lexicalMatches = await this.lexicalSearch(
+      body.query,
+      body,
+      limit * 3,
+    );
     const matches = this.mergeAndRerank(
       semanticMatches,
       lexicalMatches,
@@ -230,7 +234,10 @@ export class RagService {
     };
   }
 
-  private buildGroundedPrompt(question: string, matches: RagSearchMatch[]): string {
+  private buildGroundedPrompt(
+    question: string,
+    matches: RagSearchMatch[],
+  ): string {
     const context = matches
       .map(
         (match, idx) =>
@@ -352,7 +359,14 @@ export class RagService {
   }
 
   private tokenize(text: string): string[] {
-    return [...new Set(text.toLowerCase().split(/[^a-z0-9]+/g).filter(Boolean))];
+    return [
+      ...new Set(
+        text
+          .toLowerCase()
+          .split(/[^a-z0-9]+/g)
+          .filter(Boolean),
+      ),
+    ];
   }
 
   private termOverlapScore(content: string, terms: string[]): number {

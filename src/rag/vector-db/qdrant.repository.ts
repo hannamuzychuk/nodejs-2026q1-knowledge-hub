@@ -42,7 +42,8 @@ type QdrantSearchResponse = {
 @Injectable()
 export class QdrantRepository {
   private readonly provider = process.env.RAG_VECTOR_DB_PROVIDER || 'qdrant';
-  private readonly baseUrl = process.env.RAG_VECTOR_DB_URL || 'http://vectordb:6333';
+  private readonly baseUrl =
+    process.env.RAG_VECTOR_DB_URL || 'http://vectordb:6333';
   private readonly collection =
     process.env.RAG_VECTOR_COLLECTION || 'knowledge_hub_articles';
   private readonly timeoutMs = 10_000;
@@ -210,7 +211,9 @@ export class QdrantRepository {
         error instanceof Error &&
         (error.name === 'AbortError' || error.name === 'TypeError')
       ) {
-        throw new ServiceUnavailableException('Vector DB timeout or network error.');
+        throw new ServiceUnavailableException(
+          'Vector DB timeout or network error.',
+        );
       }
       throw new ServiceUnavailableException('Vector DB request failed.');
     } finally {
