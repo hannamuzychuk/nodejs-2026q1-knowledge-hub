@@ -69,8 +69,8 @@ export class RagController {
   @ApiParam({ name: 'articleId', format: 'uuid' })
   @ApiResponse({ status: 204, description: 'Vectors removed' })
   @ApiResponse({ status: 404, description: 'Article/index entries not found' })
-  removeFromIndex(@Param() params: RagArticleIdParamDto) {
-    this.ragService.deleteArticleFromIndex(params.articleId);
+  async removeFromIndex(@Param() params: RagArticleIdParamDto) {
+    await this.ragService.deleteArticleFromIndex(params.articleId);
   }
 
   @Get('chat/:conversationId/history')

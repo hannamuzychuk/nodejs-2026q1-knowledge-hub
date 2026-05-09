@@ -42,3 +42,11 @@ export const aiRoutes = {
   generate: () => '/ai/generate',
   usage: () => '/ai/usage',
 };
+
+export const ragRoutes = {
+  index: () => '/ai/rag/index',
+  search: () => '/ai/rag/search',
+  chat: () => '/ai/rag/chat',
+  deleteIndexedArticle: (articleId: string) => `/ai/rag/index/articles/${articleId}`,
+  history: (conversationId: string) => `/ai/rag/chat/${conversationId}/history`,
+};

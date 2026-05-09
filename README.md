@@ -472,23 +472,105 @@ Unit coverage: `src/ai/gemini.service.unit.spec.ts` (timeout, network, 401/403, 
 - Regional availability may vary by Google account/project settings.
 - AI cache and usage tracking reset on service restart (in-memory only).
 
-## Assignment 10 - RAG & Vector Database (in progress)
+## Assignment 10 - RAG & Vector Database
 
-RAG implementation for Knowledge Hub will be added in a dedicated `RagModule`.
+RAG is implemented in dedicated `RagModule` on top of Knowledge Hub `Article` data.
 
-Planned endpoints:
+Implemented endpoints:
 
-- `POST /ai/rag/index`
-- `POST /ai/rag/search`
-- `POST /ai/rag/chat`
-- `DELETE /ai/rag/index/articles/:articleId`
-- `GET /ai/rag/chat/:conversationId/history` (optional)
+- `POST /ai/rag/index` - build or refresh vector index
+- `POST /ai/rag/search` - semantic search over indexed chunks
+- `POST /ai/rag/chat` - grounded answers with source attribution
+- `DELETE /ai/rag/index/articles/:articleId` - remove vectors for single article
+- `GET /ai/rag/chat/:conversationId/history` - inspect in-memory conversation history
 
-Planned stack:
+Models and vector DB:
 
-- Gemini generation model: `gemini-2.0-flash`
-- Gemini embedding model: `text-embedding-004`
-- External vector database in Docker Compose (Qdrant)
+- Generation model: `gemini-2.0-flash` (`GEMINI_MODEL`)
+- Embedding model: `text-embedding-004` (`GEMINI_EMBEDDING_MODEL`)
+- Vector DB: Qdrant (`RAG_VECTOR_DB_PROVIDER=qdrant`)
+
+### How to obtain Gemini API key (step-by-step)
+
+1. Open [Google AI Studio](https://aistudio.google.com/).
+2. Sign in with your Google account.
+3. Open **Get API key**.
+4. Create API key in your selected Google project.
+5. Copy key value and set it as `GEMINI_API_KEY` in local `.env`.
+
+### Full startup flow after clone
+
+1. Create local env:
+
+```bash
+cp .env.example .env
+```
+
+2. Fill required variables in `.env`:
+
+```env
+GEMINI_API_KEY=your-gemini-api-key
+GEMINI_API_BASE_URL=https://generativelanguage.googleapis.com
+GEMINI_MODEL=gemini-2.0-flash
+GEMINI_EMBEDDING_MODEL=text-embedding-004
+RAG_VECTOR_DB_PROVIDER=qdrant
+RAG_VECTOR_DB_URL=http://vectordb:6333
+RAG_VECTOR_COLLECTION=knowledge_hub_articles
+RAG_CHUNK_SIZE=800
+RAG_CHUNK_OVERLAP=200
+RAG_CONVERSATION_MAX_MESSAGES=20
+```
+
+3. Start full stack (app + PostgreSQL + Qdrant):
+
+```bash
+docker compose up -d --build
+```
+
+4. Apply database migration and seed:
+
+```bash
+docker compose exec app npx prisma migrate deploy
+docker compose exec app npx prisma db seed
+```
+
+5. Open Swagger:
+
+- [http://localhost:4000/doc](http://localhost:4000/doc)
+
+### Sample RAG requests
+
+Index published articles:
+
+```bash
+curl -X POST "http://localhost:4000/ai/rag/index" \
+  -H "Content-Type: application/json" \
+  -d '{"onlyPublished":true}'
+```
+
+Semantic search:
+
+```bash
+curl -X POST "http://localhost:4000/ai/rag/search" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"How does JWT refresh work?","limit":5,"articleStatus":"published"}'
+```
+
+Grounded chat:
+
+```bash
+curl -X POST "http://localhost:4000/ai/rag/chat" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Explain token rotation in this project."}'
+```
+
+### Known limitations
+
+- Free Gemini tier has quota limits and may return provider rate limits (503 mapped upstream errors).
+- Initial indexing can be slow for larger article datasets.
+- Vector search quality depends on chunk size/overlap configuration.
+- Conversation memory is in-memory and resets on service restart.
+- Regional model availability may differ by account/project settings.
 
 
 ## Prisma Commands
