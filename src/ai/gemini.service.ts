@@ -190,7 +190,9 @@ export class GeminiService {
           );
         }
         if (errMessage) {
-          this.logger.warn(`Gemini request failed (HTTP ${status}): ${errMessage}`);
+          this.logger.warn(
+            `Gemini request failed (HTTP ${status}): ${errMessage}`,
+          );
         }
         throw new InternalServerErrorException('AI request failed.');
       }
@@ -242,9 +244,7 @@ export class GeminiService {
       );
     }
     this.logger.warn(`Gemini error payload: ${err.message || st || 'unknown'}`);
-    throw new ServiceUnavailableException(
-      'AI provider rejected the request.',
-    );
+    throw new ServiceUnavailableException('AI provider rejected the request.');
   }
 
   private async tryReadGeminiErrorJson(response: Response) {
