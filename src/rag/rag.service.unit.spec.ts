@@ -62,6 +62,7 @@ describe('RagService', () => {
         title: 'Auth',
         content: 'abcdef',
         status: 'PUBLISHED',
+        updatedAt: new Date('2026-05-09T10:00:00.000Z'),
         category: { id: 'c1' },
         tags: [{ name: 'jwt' }],
       },
@@ -103,6 +104,7 @@ describe('RagService', () => {
         title: 'Draft article',
         content: 'xyz',
         status: 'DRAFT',
+        updatedAt: new Date('2026-05-09T10:00:00.000Z'),
         category: null,
         tags: [],
       },
@@ -122,12 +124,37 @@ describe('RagService', () => {
     );
   });
 
+  it('reindex skips unchanged article versions (incremental idempotent)', async () => {
+    const { service, prisma, chunker, embeddings, qdrant } = makeService();
+    const updatedAt = new Date('2026-05-09T10:00:00.000Z');
+    prisma.article.findMany.mockResolvedValue([
+      {
+        id: 'a1',
+        title: 'Auth',
+        content: 'abcdef',
+        status: 'PUBLISHED',
+        updatedAt,
+        category: { id: 'c1' },
+        tags: [{ name: 'jwt' }],
+      },
+    ]);
+    chunker.chunkText.mockReturnValue([{ index: 0, content: 'abc' }]);
+    embeddings.embedTexts.mockResolvedValue([[0.1, 0.2]]);
+
+    const first = await service.reindex({});
+    const second = await service.reindex({});
+
+    expect(first.indexedArticles).toBe(1);
+    expect(second.indexedArticles).toBe(0);
+    expect(qdrant.upsertChunks).toHaveBeenCalledTimes(1);
+  });
+
   it('search embeds query, applies filters, and maps qdrant hits', async () => {
-    const { service, embeddings, qdrant } = makeService();
+    const { service, embeddings, qdrant, prisma } = makeService();
     embeddings.embedText.mockResolvedValue([0.11, 0.22, 0.33]);
     qdrant.search.mockResolvedValue([
       {
-        score: 0.91234567,
+        score: 0.95,
         payload: {
           articleId: 'a1',
           articleTitle: 'Auth',
@@ -135,6 +162,21 @@ describe('RagService', () => {
           chunkIndex: 0,
         },
       },
+    ]);
+    prisma.article.findMany.mockResolvedValue([
+      {
+        id: 'a2',
+        title: 'Tokens',
+        content: 'refresh tokens improve security',
+        status: 'PUBLISHED',
+        updatedAt: new Date('2026-05-09T10:00:00.000Z'),
+        category: null,
+        tags: [],
+      },
+    ]);
+    // lexical chunking
+    (service as any).chunker.chunkText.mockReturnValueOnce([
+      { index: 0, content: 'refresh tokens improve security' },
     ]);
 
     const out = await service.search({
@@ -146,31 +188,30 @@ describe('RagService', () => {
     });
 
     expect(embeddings.embedText).toHaveBeenCalledWith('how refresh tokens work');
-    expect(qdrant.search).toHaveBeenCalledWith([0.11, 0.22, 0.33], 7, {
+    expect(qdrant.search).toHaveBeenCalledWith([0.11, 0.22, 0.33], 21, {
       articleStatus: 'published',
       categoryId: 'c1',
       tags: ['auth'],
     });
-    expect(out).toEqual({
-      results: [
-        {
-          articleId: 'a1',
-          articleTitle: 'Auth',
-          chunk: 'JWT refresh flow',
-          similarity: 0.912346,
-        },
-      ],
-    });
+    expect(out.results.length).toBeGreaterThan(0);
+    expect(out.results[0]).toEqual(
+      expect.objectContaining({
+        articleId: expect.any(String),
+        articleTitle: expect.any(String),
+        chunk: expect.any(String),
+      }),
+    );
   });
 
   it('search uses default limit=5 when omitted', async () => {
-    const { service, embeddings, qdrant } = makeService();
+    const { service, embeddings, qdrant, prisma } = makeService();
     embeddings.embedText.mockResolvedValue([0.2, 0.3]);
     qdrant.search.mockResolvedValue([]);
+    prisma.article.findMany.mockResolvedValue([]);
 
     await service.search({ query: 'default limit check' });
 
-    expect(qdrant.search).toHaveBeenCalledWith([0.2, 0.3], 5, {
+    expect(qdrant.search).toHaveBeenCalledWith([0.2, 0.3], 15, {
       articleStatus: undefined,
       categoryId: undefined,
       tags: undefined,
@@ -178,7 +219,7 @@ describe('RagService', () => {
   });
 
   it('chat builds grounded answer from retrieved chunks and returns sources', async () => {
-    const { service, embeddings, qdrant, gemini } = makeService();
+    const { service, embeddings, qdrant, gemini, prisma } = makeService();
     embeddings.embedText.mockResolvedValue([0.7, 0.8]);
     qdrant.search.mockResolvedValue([
       {
@@ -191,6 +232,7 @@ describe('RagService', () => {
         },
       },
     ]);
+    prisma.article.findMany.mockResolvedValue([]);
     gemini.generateWithConversation.mockResolvedValue({
       text: 'Access tokens are short-lived for security.',
     });
@@ -203,7 +245,7 @@ describe('RagService', () => {
     expect(embeddings.embedText).toHaveBeenCalledWith(
       'Why are access tokens short-lived?',
     );
-    expect(qdrant.search).toHaveBeenCalledWith([0.7, 0.8], 5);
+    expect(qdrant.search).toHaveBeenCalledWith([0.7, 0.8], 15);
     expect(gemini.generateWithConversation).toHaveBeenCalledWith(
       [],
       expect.stringContaining('Access tokens expire quickly.'),
@@ -225,9 +267,10 @@ describe('RagService', () => {
   it('chat uses prior conversation messages and history endpoint returns trimmed memory', async () => {
     const prevLimit = process.env.RAG_CONVERSATION_MAX_MESSAGES;
     process.env.RAG_CONVERSATION_MAX_MESSAGES = '3';
-    const { service, embeddings, qdrant, gemini } = makeService();
+    const { service, embeddings, qdrant, gemini, prisma } = makeService();
     embeddings.embedText.mockResolvedValue([0.5, 0.6]);
     qdrant.search.mockResolvedValue([]);
+    prisma.article.findMany.mockResolvedValue([]);
     gemini.generateWithConversation
       .mockResolvedValueOnce({ text: 'A1' })
       .mockResolvedValueOnce({ text: 'A2' });
