@@ -10,6 +10,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtRbacGuard } from './auth/guards/jwt-rbac.guard';
 import { AiModule } from './ai/ai.module';
+import { RagModule } from './rag/rag.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { AiModule } from './ai/ai.module';
     CommentModule,
     PrismaModule,
     AiModule,
+    RagModule,
   ],
   controllers: [AppController],
   providers: [

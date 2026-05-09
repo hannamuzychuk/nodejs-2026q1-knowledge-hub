@@ -490,7 +490,6 @@ Planned stack:
 - Gemini embedding model: `text-embedding-004`
 - External vector database in Docker Compose (Qdrant)
 
-Detailed setup and examples will be documented in this section as the implementation lands.
 
 ## Prisma Commands
 
