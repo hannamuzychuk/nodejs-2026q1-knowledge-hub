@@ -472,6 +472,26 @@ Unit coverage: `src/ai/gemini.service.unit.spec.ts` (timeout, network, 401/403, 
 - Regional availability may vary by Google account/project settings.
 - AI cache and usage tracking reset on service restart (in-memory only).
 
+## Assignment 10 - RAG & Vector Database (in progress)
+
+RAG implementation for Knowledge Hub will be added in a dedicated `RagModule`.
+
+Planned endpoints:
+
+- `POST /ai/rag/index`
+- `POST /ai/rag/search`
+- `POST /ai/rag/chat`
+- `DELETE /ai/rag/index/articles/:articleId`
+- `GET /ai/rag/chat/:conversationId/history` (optional)
+
+Planned stack:
+
+- Gemini generation model: `gemini-2.0-flash`
+- Gemini embedding model: `text-embedding-004`
+- External vector database in Docker Compose (Qdrant)
+
+Detailed setup and examples will be documented in this section as the implementation lands.
+
 ## Prisma Commands
 
 ```bash
