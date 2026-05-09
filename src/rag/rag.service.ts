@@ -16,9 +16,11 @@ import { RagChunkerService } from './chunking/rag-chunker.service';
 import { GeminiEmbeddingService } from './gemini-embedding.service';
 import {
   QdrantRepository,
+  RagSearchMatch,
   RagVectorPointInput,
 } from './vector-db/qdrant.repository';
 import { PrismaService } from '../prisma/prisma.service';
+import { GeminiService } from '../ai/gemini.service';
 
 @Injectable()
 export class RagService {
@@ -27,6 +29,7 @@ export class RagService {
     private readonly embeddings: GeminiEmbeddingService,
     private readonly qdrant: QdrantRepository,
     private readonly prisma: PrismaService,
+    private readonly gemini: GeminiService,
   ) {}
 
   async reindex(body: ReindexRequestDto): Promise<ReindexResponseDto> {
@@ -125,10 +128,23 @@ export class RagService {
     };
   }
 
-  chat(body: RagChatRequestDto): RagChatResponseDto {
+  async chat(body: RagChatRequestDto): Promise<RagChatResponseDto> {
+    const queryVector = await this.embeddings.embedText(body.question);
+    const matches = await this.qdrant.search(queryVector, 5);
+    const groundedPrompt = this.buildGroundedPrompt(body.question, matches);
+    const generated = await this.gemini.generate({
+      prompt: groundedPrompt,
+      systemInstruction:
+        'You answer strictly using provided Knowledge Hub context. If evidence is insufficient, say so clearly.',
+    });
+
     return {
-      answer: `RAG scaffold is ready. Received question: ${body.question}`,
-      sources: [],
+      answer: generated.text,
+      sources: matches.map((m) => ({
+        articleId: m.payload.articleId,
+        articleTitle: m.payload.articleTitle,
+        relevantChunk: m.payload.chunk,
+      })),
       conversationId: body.conversationId || randomUUID(),
     };
   }
@@ -144,5 +160,26 @@ export class RagService {
       conversationId,
       messages: [],
     };
+  }
+
+  private buildGroundedPrompt(question: string, matches: RagSearchMatch[]): string {
+    const context = matches
+      .map(
+        (match, idx) =>
+          `[${idx + 1}] articleId=${match.payload.articleId}; title="${match.payload.articleTitle}"\n${match.payload.chunk}`,
+      )
+      .join('\n\n---\n\n');
+
+    return [
+      'Use only the context below to answer the question.',
+      'If context is insufficient, respond with: "I do not have enough indexed context to answer this question."',
+      '',
+      'Context:',
+      context || '(no context found)',
+      '',
+      `Question: ${question}`,
+      '',
+      'Return concise answer in plain text.',
+    ].join('\n');
   }
 }

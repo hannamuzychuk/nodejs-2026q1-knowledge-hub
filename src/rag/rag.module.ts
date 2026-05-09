@@ -5,6 +5,7 @@ import { RagChunkerService } from './chunking/rag-chunker.service';
 import { GeminiEmbeddingService } from './gemini-embedding.service';
 import { QdrantRepository } from './vector-db/qdrant.repository';
 import { PrismaModule } from '../prisma/prisma.module';
+import { GeminiService } from '../ai/gemini.service';
 
 @Module({
   imports: [PrismaModule],
@@ -13,6 +14,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     RagService,
     RagChunkerService,
     GeminiEmbeddingService,
+    GeminiService,
     QdrantRepository,
   ],
 })
