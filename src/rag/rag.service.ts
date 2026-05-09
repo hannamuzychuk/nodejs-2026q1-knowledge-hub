@@ -11,13 +11,17 @@ import {
   ReindexRequestDto,
   ReindexResponseDto,
 } from './dto/rag-index.dto';
+import { RagChunkerService } from './chunking/rag-chunker.service';
 
 @Injectable()
 export class RagService {
+  constructor(private readonly chunker: RagChunkerService) {}
+
   reindex(_body: ReindexRequestDto): ReindexResponseDto {
+    const initialChunksCount = this.chunker.chunkText('').length;
     return {
       indexedArticles: 0,
-      indexedChunks: 0,
+      indexedChunks: initialChunksCount,
       vectorCollection:
         process.env.RAG_VECTOR_COLLECTION || 'knowledge_hub_articles',
     };
