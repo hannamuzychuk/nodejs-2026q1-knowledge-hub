@@ -4,6 +4,7 @@ import {
   IsArray,
   IsBoolean,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
@@ -52,6 +53,7 @@ export class RagSearchRequestDto {
     example: 'How do JWT refresh tokens work in this project?',
   })
   @IsString()
+  @IsNotEmpty()
   query: string;
 
   @ApiPropertyOptional({
