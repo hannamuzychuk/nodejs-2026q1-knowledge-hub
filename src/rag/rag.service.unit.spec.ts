@@ -19,6 +19,9 @@ describe('RagService', () => {
     };
     const gemini = {
       generate: vi.fn().mockResolvedValue({ text: 'Grounded answer' }),
+      generateWithConversation: vi
+        .fn()
+        .mockResolvedValue({ text: 'Grounded answer' }),
     };
     const prisma = {
       article: {
@@ -187,7 +190,7 @@ describe('RagService', () => {
         },
       },
     ]);
-    gemini.generate.mockResolvedValue({
+    gemini.generateWithConversation.mockResolvedValue({
       text: 'Access tokens are short-lived for security.',
     });
 
@@ -200,10 +203,10 @@ describe('RagService', () => {
       'Why are access tokens short-lived?',
     );
     expect(qdrant.search).toHaveBeenCalledWith([0.7, 0.8], 5);
-    expect(gemini.generate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        prompt: expect.stringContaining('Access tokens expire quickly.'),
-      }),
+    expect(gemini.generateWithConversation).toHaveBeenCalledWith(
+      [],
+      expect.stringContaining('Access tokens expire quickly.'),
+      expect.stringContaining('You answer strictly using provided Knowledge Hub context.'),
     );
     expect(out).toEqual({
       answer: 'Access tokens are short-lived for security.',
@@ -216,5 +219,48 @@ describe('RagService', () => {
       ],
       conversationId: 'c605d258-99a8-4b11-b436-8f5d3f6ef915',
     });
+  });
+
+  it('chat uses prior conversation messages and history endpoint returns trimmed memory', async () => {
+    const prevLimit = process.env.RAG_CONVERSATION_MAX_MESSAGES;
+    process.env.RAG_CONVERSATION_MAX_MESSAGES = '3';
+    const { service, embeddings, qdrant, gemini } = makeService();
+    embeddings.embedText.mockResolvedValue([0.5, 0.6]);
+    qdrant.search.mockResolvedValue([]);
+    gemini.generateWithConversation
+      .mockResolvedValueOnce({ text: 'A1' })
+      .mockResolvedValueOnce({ text: 'A2' });
+
+    await service.chat({
+      question: 'Q1',
+      conversationId: 'c605d258-99a8-4b11-b436-8f5d3f6ef915',
+    });
+    await service.chat({
+      question: 'Q2',
+      conversationId: 'c605d258-99a8-4b11-b436-8f5d3f6ef915',
+    });
+
+    expect(gemini.generateWithConversation).toHaveBeenNthCalledWith(
+      2,
+      [
+        { role: 'user', text: 'Q1' },
+        { role: 'model', text: 'A1' },
+      ],
+      expect.any(String),
+      expect.any(String),
+    );
+
+    expect(
+      service.getConversationHistory('c605d258-99a8-4b11-b436-8f5d3f6ef915'),
+    ).toEqual({
+      conversationId: 'c605d258-99a8-4b11-b436-8f5d3f6ef915',
+      messages: [
+        { role: 'assistant', message: 'A1' },
+        { role: 'user', message: 'Q2' },
+        { role: 'assistant', message: 'A2' },
+      ],
+    });
+
+    process.env.RAG_CONVERSATION_MAX_MESSAGES = prevLimit;
   });
 });

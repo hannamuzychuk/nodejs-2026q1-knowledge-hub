@@ -24,6 +24,15 @@ import { GeminiService } from '../ai/gemini.service';
 
 @Injectable()
 export class RagService {
+  private readonly conversationMaxMessages = this.parsePositiveInt(
+    process.env.RAG_CONVERSATION_MAX_MESSAGES,
+    20,
+  );
+  private readonly conversations = new Map<
+    string,
+    Array<{ role: 'user' | 'assistant'; message: string }>
+  >();
+
   constructor(
     private readonly chunker: RagChunkerService,
     private readonly embeddings: GeminiEmbeddingService,
@@ -129,14 +138,27 @@ export class RagService {
   }
 
   async chat(body: RagChatRequestDto): Promise<RagChatResponseDto> {
+    const conversationId = body.conversationId || randomUUID();
+    const history = this.conversations.get(conversationId) || [];
     const queryVector = await this.embeddings.embedText(body.question);
     const matches = await this.qdrant.search(queryVector, 5);
     const groundedPrompt = this.buildGroundedPrompt(body.question, matches);
-    const generated = await this.gemini.generate({
-      prompt: groundedPrompt,
-      systemInstruction:
-        'You answer strictly using provided Knowledge Hub context. If evidence is insufficient, say so clearly.',
-    });
+    const generated = await this.gemini.generateWithConversation(
+      history.map((item) => ({
+        role: item.role === 'assistant' ? 'model' : 'user',
+        text: item.message,
+      })),
+      groundedPrompt,
+      'You answer strictly using provided Knowledge Hub context. If evidence is insufficient, say so clearly.',
+    );
+
+    const updatedHistory = [
+      ...history,
+      { role: 'user' as const, message: body.question },
+      { role: 'assistant' as const, message: generated.text },
+    ];
+    const trimmed = updatedHistory.slice(-this.conversationMaxMessages);
+    this.conversations.set(conversationId, trimmed);
 
     return {
       answer: generated.text,
@@ -145,7 +167,7 @@ export class RagService {
         articleTitle: m.payload.articleTitle,
         relevantChunk: m.payload.chunk,
       })),
-      conversationId: body.conversationId || randomUUID(),
+      conversationId,
     };
   }
 
@@ -158,7 +180,7 @@ export class RagService {
   ): RagConversationHistoryResponseDto {
     return {
       conversationId,
-      messages: [],
+      messages: this.conversations.get(conversationId) || [],
     };
   }
 
@@ -181,5 +203,13 @@ export class RagService {
       '',
       'Return concise answer in plain text.',
     ].join('\n');
+  }
+
+  private parsePositiveInt(raw: string | undefined, fallback: number): number {
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return fallback;
+    }
+    return Math.floor(parsed);
   }
 }
