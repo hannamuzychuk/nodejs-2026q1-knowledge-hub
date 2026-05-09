@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Status } from '@prisma/client';
 import {
@@ -171,8 +171,20 @@ export class RagService {
     };
   }
 
-  deleteArticleFromIndex(_articleId: string): void {
-    return;
+  async deleteArticleFromIndex(articleId: string): Promise<void> {
+    const article = await this.prisma.article.findUnique({
+      where: { id: articleId },
+      select: { id: true },
+    });
+    if (!article) {
+      throw new NotFoundException(`Article with ID ${articleId} not found`);
+    }
+    const operationId = await this.qdrant.deleteByArticleId(articleId);
+    if (!operationId) {
+      throw new NotFoundException(
+        `No indexed vectors found for article ${articleId}`,
+      );
+    }
   }
 
   getConversationHistory(

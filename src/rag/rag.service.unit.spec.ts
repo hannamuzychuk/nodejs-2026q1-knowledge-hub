@@ -26,6 +26,7 @@ describe('RagService', () => {
     const prisma = {
       article: {
         findMany: vi.fn(),
+        findUnique: vi.fn(),
       },
     };
     const service = new RagService(
@@ -262,5 +263,26 @@ describe('RagService', () => {
     });
 
     process.env.RAG_CONVERSATION_MAX_MESSAGES = prevLimit;
+  });
+
+  it('deleteArticleFromIndex throws 404 when article does not exist', async () => {
+    const { service, prisma } = makeService();
+    prisma.article.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.deleteArticleFromIndex('c605d258-99a8-4b11-b436-8f5d3f6ef915'),
+    ).rejects.toThrow('not found');
+  });
+
+  it('deleteArticleFromIndex throws 404 when no vectors were removed', async () => {
+    const { service, prisma, qdrant } = makeService();
+    prisma.article.findUnique.mockResolvedValue({
+      id: 'c605d258-99a8-4b11-b436-8f5d3f6ef915',
+    });
+    qdrant.deleteByArticleId.mockResolvedValue(0);
+
+    await expect(
+      service.deleteArticleFromIndex('c605d258-99a8-4b11-b436-8f5d3f6ef915'),
+    ).rejects.toThrow('No indexed vectors');
   });
 });
