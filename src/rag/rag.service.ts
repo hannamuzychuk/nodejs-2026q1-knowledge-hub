@@ -106,8 +106,23 @@ export class RagService {
     };
   }
 
-  search(_body: RagSearchRequestDto): RagSearchResponseDto {
-    return { results: [] };
+  async search(body: RagSearchRequestDto): Promise<RagSearchResponseDto> {
+    const limit = body.limit || 5;
+    const queryVector = await this.embeddings.embedText(body.query);
+    const matches = await this.qdrant.search(queryVector, limit, {
+      articleStatus: body.articleStatus,
+      categoryId: body.categoryId,
+      tags: body.tags,
+    });
+
+    return {
+      results: matches.map((m) => ({
+        articleId: m.payload.articleId,
+        articleTitle: m.payload.articleTitle,
+        chunk: m.payload.chunk,
+        similarity: Number(m.score.toFixed(6)),
+      })),
+    };
   }
 
   chat(body: RagChatRequestDto): RagChatResponseDto {

@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RagService } from './rag.service';
 
-describe('RagService reindex', () => {
+describe('RagService', () => {
   const makeService = () => {
     const chunker = {
       chunkText: vi.fn(),
     };
     const embeddings = {
+      embedText: vi.fn(),
       embedTexts: vi.fn(),
     };
     const qdrant = {
@@ -14,6 +15,7 @@ describe('RagService reindex', () => {
       deleteByArticleId: vi.fn().mockResolvedValue(1),
       ensureCollection: vi.fn().mockResolvedValue(undefined),
       upsertChunks: vi.fn().mockResolvedValue(undefined),
+      search: vi.fn().mockResolvedValue([]),
     };
     const prisma = {
       article: {
@@ -110,5 +112,60 @@ describe('RagService reindex', () => {
         },
       }),
     );
+  });
+
+  it('search embeds query, applies filters, and maps qdrant hits', async () => {
+    const { service, embeddings, qdrant } = makeService();
+    embeddings.embedText.mockResolvedValue([0.11, 0.22, 0.33]);
+    qdrant.search.mockResolvedValue([
+      {
+        score: 0.91234567,
+        payload: {
+          articleId: 'a1',
+          articleTitle: 'Auth',
+          chunk: 'JWT refresh flow',
+          chunkIndex: 0,
+        },
+      },
+    ]);
+
+    const out = await service.search({
+      query: 'how refresh tokens work',
+      limit: 7,
+      articleStatus: 'published',
+      categoryId: 'c1',
+      tags: ['auth'],
+    });
+
+    expect(embeddings.embedText).toHaveBeenCalledWith('how refresh tokens work');
+    expect(qdrant.search).toHaveBeenCalledWith([0.11, 0.22, 0.33], 7, {
+      articleStatus: 'published',
+      categoryId: 'c1',
+      tags: ['auth'],
+    });
+    expect(out).toEqual({
+      results: [
+        {
+          articleId: 'a1',
+          articleTitle: 'Auth',
+          chunk: 'JWT refresh flow',
+          similarity: 0.912346,
+        },
+      ],
+    });
+  });
+
+  it('search uses default limit=5 when omitted', async () => {
+    const { service, embeddings, qdrant } = makeService();
+    embeddings.embedText.mockResolvedValue([0.2, 0.3]);
+    qdrant.search.mockResolvedValue([]);
+
+    await service.search({ query: 'default limit check' });
+
+    expect(qdrant.search).toHaveBeenCalledWith([0.2, 0.3], 5, {
+      articleStatus: undefined,
+      categoryId: undefined,
+      tags: undefined,
+    });
   });
 });
