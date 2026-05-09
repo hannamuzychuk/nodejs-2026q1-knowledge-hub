@@ -479,10 +479,16 @@ RAG is implemented in dedicated `RagModule` on top of Knowledge Hub `Article` da
 Implemented endpoints:
 
 - `POST /ai/rag/index` - build or refresh vector index
-- `POST /ai/rag/search` - semantic search over indexed chunks
+- `POST /ai/rag/search` - hybrid retrieval (semantic + lexical) with ranked chunks
 - `POST /ai/rag/chat` - grounded answers with source attribution
 - `DELETE /ai/rag/index/articles/:articleId` - remove vectors for single article
 - `GET /ai/rag/chat/:conversationId/history` - inspect in-memory conversation history
+
+Hacker-scope additions:
+
+- Hybrid retrieval merges vector similarity with lexical match scores.
+- Secondary reranking boosts chunks that better match question terms.
+- Incremental/idempotent indexing skips unchanged article revisions and removes stale vectors for articles that no longer match index scope.
 
 Models and vector DB:
 
