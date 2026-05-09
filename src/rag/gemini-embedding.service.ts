@@ -57,7 +57,10 @@ export class GeminiEmbeddingService {
     return vectors;
   }
 
-  private async fetchWithTimeout(url: string, payload: Record<string, unknown>) {
+  private async fetchWithTimeout(
+    url: string,
+    payload: Record<string, unknown>,
+  ) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {

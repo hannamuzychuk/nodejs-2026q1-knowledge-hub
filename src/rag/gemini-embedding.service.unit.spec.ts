@@ -56,7 +56,8 @@ describe('GeminiEmbeddingService', () => {
     const service = new GeminiEmbeddingService();
     await service.embedText('hello');
 
-    const url = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    const url = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as string;
     expect(url).toMatch(
       /^https:\/\/example-gemini\.test\/v1beta\/models\/text-embedding-004:embedContent/,
     );
@@ -118,6 +119,8 @@ describe('GeminiEmbeddingService', () => {
       [0.1, 0.2, 0.3],
       [0.1, 0.2, 0.3],
     ]);
-    expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBe(2);
+    expect(
+      (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+    ).toBe(2);
   });
 });

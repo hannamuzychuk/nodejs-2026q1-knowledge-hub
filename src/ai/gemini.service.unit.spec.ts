@@ -55,7 +55,8 @@ describe('GeminiService', () => {
     const svc = new GeminiService();
     await svc.generate({ prompt: 'x' });
 
-    const url = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    const url = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as string;
     expect(url).toContain('/models/gemini-2.0-flash:generateContent');
     expect(url).toContain('key=unit-test-key');
   });
@@ -68,8 +69,11 @@ describe('GeminiService', () => {
     const svc = new GeminiService();
     await svc.generate({ prompt: 'y' });
 
-    const url = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    expect(url).toMatch(/^https:\/\/example-gemini\.test\/v1beta\/models\/custom-model-x:generateContent/);
+    const url = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as string;
+    expect(url).toMatch(
+      /^https:\/\/example-gemini\.test\/v1beta\/models\/custom-model-x:generateContent/,
+    );
     expect(url).toContain('key=k2');
   });
 
@@ -165,9 +169,9 @@ describe('GeminiService', () => {
     const svc = new GeminiService();
     const out = await svc.generate({ prompt: 'x' });
     expect(out.text).toBe('after retry');
-    expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBe(
-      2,
-    );
+    expect(
+      (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+    ).toBe(2);
   });
 
   it('after max retries on 429 returns 503', async () => {
@@ -218,7 +222,10 @@ describe('GeminiService', () => {
         ok: false,
         status: 400,
         json: async () => ({
-          error: { message: 'Invalid JSON payload', status: 'INVALID_ARGUMENT' },
+          error: {
+            message: 'Invalid JSON payload',
+            status: 'INVALID_ARGUMENT',
+          },
         }),
       }),
     );

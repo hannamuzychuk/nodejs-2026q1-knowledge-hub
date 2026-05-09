@@ -187,7 +187,9 @@ describe('RagService', () => {
       tags: ['auth'],
     });
 
-    expect(embeddings.embedText).toHaveBeenCalledWith('how refresh tokens work');
+    expect(embeddings.embedText).toHaveBeenCalledWith(
+      'how refresh tokens work',
+    );
     expect(qdrant.search).toHaveBeenCalledWith([0.11, 0.22, 0.33], 21, {
       articleStatus: 'published',
       categoryId: 'c1',
@@ -249,7 +251,9 @@ describe('RagService', () => {
     expect(gemini.generateWithConversation).toHaveBeenCalledWith(
       [],
       expect.stringContaining('Access tokens expire quickly.'),
-      expect.stringContaining('You answer strictly using provided Knowledge Hub context.'),
+      expect.stringContaining(
+        'You answer strictly using provided Knowledge Hub context.',
+      ),
     );
     expect(out).toEqual({
       answer: 'Access tokens are short-lived for security.',

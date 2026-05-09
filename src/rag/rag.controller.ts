@@ -55,7 +55,9 @@ export class RagController {
   }
 
   @Post('chat')
-  @ApiOperation({ summary: 'Ask question grounded in indexed Knowledge Hub data' })
+  @ApiOperation({
+    summary: 'Ask question grounded in indexed Knowledge Hub data',
+  })
   @ApiBody({ type: RagChatRequestDto })
   @ApiResponse({ status: 200, type: RagChatResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid chat request' })
